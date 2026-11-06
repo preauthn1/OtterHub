@@ -1,6 +1,6 @@
 import { FileItem, FileTag } from "@shared/types";
 
-// 标签展示配置
+// 标签展示配置（taste-skill 规范：零紫色/薰衣草色，4.5:1+ 对比度）
 export interface TagDisplayConfig {
   label: string;
   description: string;
@@ -13,16 +13,16 @@ export const TAG_CONFIG: Record<FileTag, TagDisplayConfig> = {
   [FileTag.NSFW]: {
     label: "NSFW",
     description: "敏感内容",
-    bgColor: "bg-amber-500/20",
-    textColor: "text-amber-700 dark:text-amber-300",
-    borderColor: "border-amber-500/50",
+    bgColor: "bg-amber-500/15",
+    textColor: "text-amber-800 dark:text-amber-300",
+    borderColor: "border-amber-500/40",
   },
   [FileTag.Private]: {
     label: "Private",
     description: "私有文件",
-    bgColor: "bg-purple-500/20",
-    textColor: "text-purple-700 dark:text-purple-300",
-    borderColor: "border-purple-500/50",
+    bgColor: "bg-sky-500/15",
+    textColor: "text-sky-800 dark:text-sky-300",
+    borderColor: "border-sky-500/40",
   },
 };
 
@@ -34,34 +34,22 @@ export enum BatchTagState {
 
 export type TagStateMap = Record<FileTag, BatchTagState>;
 
-/**
- * 标签操作意图：用户想做什么
- */
 export type TagIntent = "keep" | "add" | "remove";
 
-/**
- * 表驱动的状态跳转规则
- * 格式：NEXT_STATE[original][current] = [nextState]
- */
 const NEXT_STATE: Record<
   BatchTagState,
   Record<BatchTagState, BatchTagState[]>
 > = {
-  // original = none
   [BatchTagState.None]: {
     [BatchTagState.None]: [BatchTagState.All],
     [BatchTagState.All]: [BatchTagState.None],
-    [BatchTagState.Partial]: [], // 不会出现
+    [BatchTagState.Partial]: [],
   },
-
-  // original = all
   [BatchTagState.All]: {
     [BatchTagState.All]: [BatchTagState.None],
     [BatchTagState.None]: [BatchTagState.All],
     [BatchTagState.Partial]: [],
   },
-
-  // original = partial
   [BatchTagState.Partial]: {
     [BatchTagState.Partial]: [BatchTagState.All],
     [BatchTagState.All]: [BatchTagState.None],
@@ -69,11 +57,6 @@ const NEXT_STATE: Record<
   },
 };
 
-/**
- * 获取标签操作意图
- * @param current 当前UI状态
- * @param original 原始分布状态
- */
 export function getTagIntent(
   current: BatchTagState,
   original: BatchTagState,
@@ -83,9 +66,6 @@ export function getTagIntent(
   return "remove";
 }
 
-/**
- * 计算某一批文件中，各标签的原始分布状态
- */
 export function calcOriginalTagStates(files: FileItem[]): TagStateMap {
   const states = Object.fromEntries(
     Object.values(FileTag).map((tag) => [tag, BatchTagState.None]),
@@ -108,10 +88,6 @@ export function calcOriginalTagStates(files: FileItem[]): TagStateMap {
   return states;
 }
 
-/**
- * 三态切换规则（唯一入口）
- * 使用表驱动的方式实现状态跳转
- */
 export function nextTagState(
   current: BatchTagState,
   original: BatchTagState,
@@ -120,10 +96,6 @@ export function nextTagState(
   return next?.[0] ?? current;
 }
 
-/**
- * 计算单个文件的最终标签
- * 基于 intent 语义，更清晰的业务逻辑
- */
 export function applyTagStates(
   existing: FileTag[],
   states: TagStateMap,
@@ -136,15 +108,11 @@ export function applyTagStates(
 
     if (intent === "add") result.add(tag);
     if (intent === "remove") result.delete(tag);
-    // intent === "keep"：什么都不做
   }
 
   return [...result];
 }
 
-/**
- * 是否有任何标签发生了变化
- */
 export function hasAnyTagChange(
   states: TagStateMap,
   original: TagStateMap,

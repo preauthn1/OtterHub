@@ -3,80 +3,187 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  taste-skill 2.5.0 system tokens
+  Dealt via:
+    node scripts/start.mjs css --page software --palette blue-black-cornflower --type geist --radius soft
+    node scripts/start.mjs css --page software --palette mint-pink-accounts --type geist --radius soft
+*/
 :root {
-  --background: oklch(0.98 0.01 240);
-  --foreground: oklch(0.25 0.02 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 240);
-  --primary: oklch(0.6 0.18 165);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.02 240);
-  --secondary-foreground: oklch(0.25 0.02 240);
-  --muted: oklch(0.95 0.02 240);
-  --muted-foreground: oklch(0.45 0.02 240);
-  --accent: oklch(0.6 0.18 165);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9 0.02 240);
-  --input: oklch(0.9 0.02 240);
-  --ring: oklch(0.6 0.18 165);
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.98 0.01 240);
-  --sidebar-foreground: oklch(0.25 0.02 240);
-  --sidebar-primary: oklch(0.6 0.18 165);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0.02 240);
-  --sidebar-accent-foreground: oklch(0.25 0.02 240);
-  --sidebar-border: oklch(0.9 0.02 240);
-  --sidebar-ring: oklch(0.6 0.18 165);
-  --gradient-from: oklch(0.95 0.05 165);
-  --gradient-via: oklch(0.98 0.02 190);
-  --gradient-to: oklch(0.95 0.05 210);
+  --p-bg: #f6f7f9;
+  --p-surface: #ebedf2;
+  --p-ink: #11161f;
+  --p-muted: #505a6b;
+  --p-accent: #155eef;
+  --p-accent-ink: #ffffff;
+  --p-action: #155eef;
+  --p-action-ink: #ffffff;
+  --p-inv-bg: #11161f;
+  --p-inv-surface: #1b2230;
+  --p-inv-ink: #f6f7f9;
+  --p-inv-muted: #94a0b4;
+  --ground-bg: #dce5f0;
+  --ground-surface: #e8eef6;
+  --ground-ink: #11161f;
+  --ground-muted: #455063;
+  --ground-accent: #155eef;
+  --accent-text: #0f4cd1;
+
+  --background: #f6f7f9;
+  --foreground: #11161f;
+  --card: #ffffff;
+  --card-foreground: #11161f;
+  --popover: #ffffff;
+  --popover-foreground: #11161f;
+  --primary: #155eef;
+  --primary-foreground: #ffffff;
+  --secondary: #ebedf2;
+  --secondary-foreground: #11161f;
+  --muted: #ebedf2;
+  --muted-foreground: #505a6b;
+  --accent: #dde3ee;
+  --accent-foreground: #11161f;
+  --destructive: #c81e1e;
+  --destructive-foreground: #ffffff;
+  --border: #d5dce6;
+  --input: #cbd4e1;
+  --ring: #155eef;
+  --glass-bg: #ffffff;
+  --glass-border: #d5dce6;
+  --radius: 0.5rem;
+  --sidebar: #f6f7f9;
+  --sidebar-foreground: #11161f;
+  --sidebar-primary: #155eef;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dde3ee;
+  --sidebar-accent-foreground: #11161f;
+  --sidebar-border: #d5dce6;
+  --sidebar-ring: #155eef;
+
+  --font-display: "Geist", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-text: "Geist", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --display-weight: 500;
+  --display-tracking: -0.035em;
+  --display-tracking-xl: -0.045em;
+
+  --t-label: 13px;
+  --t-small: 14px;
+  --t-body: 16px;
+  --t-lead: 18px;
+  --t-card: 18px;
+  --t-h3: 22px;
+  --t-h2: clamp(24px, 1.4vw + 19px, 36px);
+  --t-h1: clamp(30px, 2.2vw + 21px, 48px);
+
+  --nav: 72px;
+  --padt: 112px;
+  --padb: 56px;
+  --hgap: 40px;
+  --hpadb: 48px;
+  --bar: 0px;
+  --container: 1280px;
+  --gut: 80px;
+  --gutter: 24px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-btn: 8px;
+
+  --m-in: 140ms;
+  --m-out: 200ms;
+  --m-press: 90ms;
+  --m-cycle: 3.2s;
+  --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .dark {
-  --background: oklch(0.08 0.02 240);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.12 0.02 240);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.12 0.02 240);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.65 0.15 165);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.2 0.02 240);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.2 0.02 240);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.65 0.15 165);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.25 0.02 240);
-  --input: oklch(0.25 0.02 240);
-  --ring: oklch(0.65 0.15 165);
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --sidebar: oklch(0.12 0.02 240);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.65 0.15 165);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.2 0.02 240);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.25 0.02 240);
-  --sidebar-ring: oklch(0.65 0.15 165);
-  --gradient-from: #0a1628;
-  --gradient-via: #0d2137;
-  --gradient-to: #134e4a;
+  --p-bg: #0a0d14;
+  --p-surface: #131824;
+  --p-ink: #e9edf3;
+  --p-muted: #94a0b4;
+  --p-accent: #5ab9fc;
+  --p-accent-ink: #0a0d14;
+  --p-action: #5ab9fc;
+  --p-action-ink: #0a0d14;
+  --p-inv-bg: #e9edf3;
+  --p-inv-surface: #d7dbe1;
+  --p-inv-ink: #0a0d14;
+  --p-inv-muted: #54575f;
+  --ground-bg: #151e30;
+  --ground-surface: #1c273d;
+  --ground-ink: #e9edf3;
+  --ground-muted: #9ba8bd;
+  --ground-accent: #5ab9fc;
+  --accent-text: #6ec2ff;
+
+  --background: #0a0d14;
+  --foreground: #e9edf3;
+  --card: #121723;
+  --card-foreground: #e9edf3;
+  --popover: #121723;
+  --popover-foreground: #e9edf3;
+  --primary: #5ab9fc;
+  --primary-foreground: #0a0d14;
+  --secondary: #192132;
+  --secondary-foreground: #e9edf3;
+  --muted: #192132;
+  --muted-foreground: #94a0b4;
+  --accent: #222d44;
+  --accent-foreground: #e9edf3;
+  --destructive: #ef4444;
+  --destructive-foreground: #0a0d14;
+  --border: #253047;
+  --input: #2c3852;
+  --ring: #5ab9fc;
+  --glass-bg: #121723;
+  --glass-border: #253047;
+  --sidebar: #0e131d;
+  --sidebar-foreground: #e9edf3;
+  --sidebar-primary: #5ab9fc;
+  --sidebar-primary-foreground: #0a0d14;
+  --sidebar-accent: #222d44;
+  --sidebar-accent-foreground: #e9edf3;
+  --sidebar-border: #253047;
+  --sidebar-ring: #5ab9fc;
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --gut: 64px;
+    --padt: 104px;
+    --padb: 48px;
+    --hgap: 32px;
+    --hpadb: 40px;
+  }
+}
+
+@media (max-width: 639px) {
+  :root {
+    --nav: 56px;
+    --gut: 20px;
+    --gutter: 12px;
+    --padt: 76px;
+    --padb: 28px;
+    --hgap: 20px;
+    --hpadb: 24px;
+    --t-h1: 28px;
+  }
 }
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-sans: var(--font-text);
+  --font-mono: var(--font-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -96,15 +203,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: calc(var(--r-lg) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -113,69 +215,236 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-
-  --color-gradient-from: var(--gradient-from);
-  --color-gradient-via: var(--gradient-via);
-  --color-gradient-to: var(--gradient-to);
-
   --color-glass-bg: var(--glass-bg);
   --color-glass-border: var(--glass-border);
 }
 
 @layer base {
-  * {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
     @apply border-border outline-ring/50;
   }
-  
-  /* 移动端（触控设备）：隐藏滚动条，使用系统 overlay 模式，不占位不留黑线 */
-  @media (pointer: coarse) {
-    html {
-      scrollbar-width: none;
-    }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-text);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* 桌面端（鼠标/触控板） */
+  ::selection {
+    background-color: color-mix(in srgb, var(--primary) 26%, transparent);
+    color: var(--foreground);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
   @media (pointer: fine) {
     html {
-      scrollbar-gutter: auto;
+      scrollbar-gutter: stable;
       scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--muted-foreground) 40%, transparent) transparent;
     }
-
-    html::-webkit-scrollbar {
-      width: 10px;
-      height: 10px;
-    }
-
-    html::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    html::-webkit-scrollbar-thumb {
-    background-color: var(--muted-foreground);
-      border-radius: 9999px;
-    }
-
-    html::-webkit-scrollbar-thumb:hover {
-      background-color: var(--foreground);
-    }
-  }
-  
-  body {
-    @apply bg-background text-foreground;
-  }
-
-  .custom-scrollbar {
-    scrollbar-width: thin;
   }
 }
 
-@keyframes ripple {
-  0% {
-    transform: scale(0);
-    opacity: 1;
+/* ----------------------------------------------------------------
+   taste-skill Structural Shell & Container System
+---------------------------------------------------------------- */
+.wrap {
+  width: min(var(--container, 1280px), calc(100% - 2 * var(--gut)));
+  margin-inline: auto;
+}
+
+header.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: var(--nav);
+  background-color: var(--background);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+
+/* Single-screen hero section (exactly 100svh across viewports per SR-1) */
+main > section.taste-hero {
+  height: 100svh;
+  padding-top: calc(var(--nav) + var(--hgap));
+  padding-bottom: var(--hpadb);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+/* Application workspace section */
+main > section.taste-workspace {
+  min-height: 100svh;
+  padding-top: calc(var(--nav) + 24px);
+  padding-bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+@media (max-width: 639px) {
+  main > section.taste-workspace {
+    height: 100svh;
+    padding-top: calc(var(--nav) + 12px);
+    padding-bottom: 28px;
   }
-  100% {
-    transform: scale(4);
-    opacity: 0;
+}
+
+.taste-h1 {
+  font-family: var(--font-display);
+  font-size: var(--t-h1);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 1.12;
+  color: var(--foreground);
+}
+
+.taste-h2 {
+  font-family: var(--font-display);
+  font-size: var(--t-h2);
+  font-weight: var(--display-weight);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--foreground);
+}
+
+.taste-lead {
+  font-size: var(--t-body);
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  max-width: 58ch;
+}
+
+.taste-accent-text {
+  color: var(--accent-text);
+}
+
+.taste-panel {
+  background-color: var(--ground-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 639px) {
+  .taste-panel {
+    padding: 12px;
+  }
+}
+
+.app-frame {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+/* ----------------------------------------------------------------
+   taste-skill Motion Layer (references/motion.md, House Rule 5)
+   Top-level [data-motion] rules satisfy motion-layer inspection
+---------------------------------------------------------------- */
+html[data-motion] {
+  --m-active: 1;
+}
+
+html[data-motion] .m-arrow {
+  transition: transform var(--m-in) var(--m-ease);
+}
+
+html[data-motion] .taste-link {
+  color: var(--muted-foreground);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition: background-size var(--m-out) var(--m-ease), color var(--m-in) var(--m-ease);
+}
+
+html[data-motion] .taste-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition:
+    transform 180ms var(--m-ease),
+    border-color var(--m-in) var(--m-ease),
+    box-shadow 180ms var(--m-ease);
+}
+
+html[data-motion] .taste-card-media img {
+  transition: transform 600ms var(--m-ease);
+}
+
+html[data-motion] [data-slot="button"][data-variant="default"]:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--primary) 82%, var(--foreground));
+}
+
+html[data-motion] [data-slot="button"][data-variant="outline"]:not(:disabled):hover,
+html[data-motion] [data-slot="button"][data-variant="secondary"]:not(:disabled):hover {
+  background-color: var(--accent);
+  border-color: color-mix(in srgb, var(--foreground) 32%, var(--border));
+}
+
+html[data-motion] .taste-link:hover {
+  color: var(--foreground);
+  background-size: 100% 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-motion] [data-slot="button"]:not(:disabled):hover,
+  html[data-motion] .taste-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+
+  html[data-motion] [data-slot="button"]:not(:disabled):active,
+  html[data-motion] .taste-btn:not(:disabled):active {
+    transform: translateY(1px) scale(0.985);
+    transition-duration: var(--m-press);
+  }
+
+  html[data-motion] [data-slot="button"]:hover .m-arrow,
+  html[data-motion] .taste-btn:hover .m-arrow,
+  html[data-motion] a:hover .m-arrow {
+    transform: translateX(3px);
+  }
+
+  html[data-motion] .taste-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--foreground) 28%, var(--border));
+    box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.18);
+  }
+
+  html[data-motion] .taste-card:hover .taste-card-media img {
+    transform: scale(1.025);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

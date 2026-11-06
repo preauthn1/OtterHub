@@ -9,13 +9,17 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  // resolvedTheme 在服务端为 undefined，客户端才为 'light' 或 'dark'
-  const isHydrated = resolvedTheme !== undefined;
-  const isDark = resolvedTheme === "dark";
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = !mounted || resolvedTheme === "dark";
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -23,16 +27,15 @@ export function ThemeToggle() {
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             onClick={() => {
-              if (!isHydrated) return;
+              if (!mounted) return;
               setTheme(isDark ? "light" : "dark");
             }}
-            className="h-9 w-9 text-foreground/60 hover:text-foreground hover:bg-secondary/50"
-            disabled={!isHydrated}
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
             aria-label="切换主题"
           >
-            {!isHydrated ? null : isDark ? (
+            {isDark ? (
               <Moon className="h-4 w-4" />
             ) : (
               <Sun className="h-4 w-4" />
@@ -40,7 +43,7 @@ export function ThemeToggle() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{!isHydrated ? "切换主题" : isDark ? "深色模式" : "浅色模式"}</p>
+          <p>{!mounted ? "切换主题" : isDark ? "深色模式" : "浅色模式"}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -1,1 +1,15 @@
-<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="#00CD99" rx="80" ry="80"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-family="Times New Roman" font-weight="normal" fill="#70e000" font-size="351.1808" dy="0">🦦</text></svg>
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="oh_grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="55%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0891B2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#oh_grad)"/>
+  <path d="M15 45H47C52.5228 45 57 40.5228 57 35C57 29.912 53.2002 25.7102 48.2792 25.082C46.7126 17.6088 40.089 12 32.1666 12C23.5944 12 16.5477 18.555 15.7805 26.9192C10.8213 27.9776 7 32.3824 7 37.6666C7 41.7168 10.5817 45 15 45Z" stroke="white" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 31C25 29.3431 26.3431 28 28 28H36C37.6569 28 39 29.3431 39 31C39 33.7614 36.7614 36 34 36H30C27.2386 36 25 33.7614 25 31Z" fill="white"/>
+  <circle cx="23" cy="24" r="2.4" fill="white"/>
+  <circle cx="41" cy="24" r="2.4" fill="white"/>
+  <path d="M21 52H43" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.7"/>
+</svg>
