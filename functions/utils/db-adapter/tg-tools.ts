@@ -115,6 +115,15 @@ export function resolveFileDescriptor(
   }
 
   if (fileType === FileType.Image) {
+    // Telegram Bot API sendPhoto 限制 10MB，超过 10MB 直接走 sendDocument 避免双倍上传失败重试
+    if (file.size > 10 * 1024 * 1024) {
+      return {
+        apiEndpoint: "sendDocument",
+        field: "document",
+        fileType: FileType.Image,
+        ext,
+      };
+    }
     return {
       apiEndpoint: "sendPhoto",
       field: "photo",

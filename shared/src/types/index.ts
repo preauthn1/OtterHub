@@ -70,6 +70,27 @@ export interface ChunkUploadInitPayload {
   fileSize: number;
   totalChunks: number;
   tags?: UploadTagsInput;
+  deferKv?: boolean;
+}
+
+export interface UploadedChunkResult {
+  chunkIndex: number;
+  chunkId: string;
+  size: number;
+  thumbUrl?: string;
+}
+
+export interface ChunkUploadCompletePayload {
+  key: string;
+  fileType?: FileType;
+  fileName?: string;
+  fileSize?: number;
+  totalChunks?: number;
+  tags?: UploadTagsInput;
+  nsfw?: boolean;
+  thumbUrl?: string;
+  chunks: Chunk[];
+  partial?: boolean;
 }
 
 export interface UrlUploadPayload {
@@ -198,6 +219,6 @@ export const MAX_CHUNK_SIZE = 20 * 1024 * 1024; // 20MB, TG BOT API 可供下载
 
 // 打包分享最大文件数量限制（防止 Cloudflare Worker CPU 超时）
 export const MAX_FILES_IN_BUNDLE = 50;
-export const MAX_CHUNK_NUM = 50                 // 由于Cloudflare Worker的CPU限制，这里限制最大分片数为50, 即文件大小不得超过1000MB≈1GB
+export const MAX_CHUNK_NUM = 100                // 支持最高 100 个分片 (20MB * 100 ≈ 2GB 大文件流式直传与 Range 合并)
 export const MAX_FILE_SIZE = MAX_CHUNK_SIZE * MAX_CHUNK_NUM
 export const TRASH_EXPIRATION_TTL = 30 * 24 * 60 * 60; // 设置 30 天过期

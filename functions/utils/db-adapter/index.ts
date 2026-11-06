@@ -1,4 +1,4 @@
-import { FileMetadata } from "@shared/types";
+import { FileMetadata, UploadedChunkResult } from "@shared/types";
 import { isDev } from "../common";
 import { R2Adapter } from "./r2-adapter";
 import { TGAdapter } from "./tg-adapter";
@@ -16,6 +16,12 @@ export interface DBAdapter {
     chunkFile: File | Blob,
     waitUntil?: (promise: Promise<any>) => void,
   ): Promise<{ chunkIndex: number }>;
+  uploadChunkDirect(
+    key: string,
+    chunkIndex: number,
+    chunkFile: File | Blob,
+    fileName?: string,
+  ): Promise<UploadedChunkResult>;
 
   // 获取文件，永远返回Response
   get(key: string, req?: Request): Promise<Response>;

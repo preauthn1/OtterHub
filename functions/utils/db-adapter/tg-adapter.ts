@@ -187,67 +187,102 @@ export class TGAdapter extends BaseAdapter {
     chunkIndex: number,
     fileName?: string,
   ): Promise<{ chunkId: string; thumbUrl?: string }> {
-    const formData = new FormData();
-    formData.append("chat_id", this.env.TG_CHAT_ID);
+    const safeBase = (fileName || parentKey || "chunk")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(0, 48);
+    const partName = `${safeBase}.part${String(chunkIndex).padStart(4, "0")}.bin`;
 
-    // 确保是 File 实例以便带有文件名
-    let fileToUpload: File;
-    if (chunkIndex === 0 && fileName) {
-      // 如果是第一个分片且有文件名，使用原文件名以帮助Telegram识别文件类型（如视频）
-      const blob =
-        chunkFile instanceof File ? chunkFile : new Blob([chunkFile as unknown as BlobPart]);
-      const type = chunkFile instanceof File ? chunkFile.type : undefined;
-      fileToUpload = new File([blob], fileName, { type });
-    } else if (chunkFile instanceof File) {
-      fileToUpload = chunkFile;
-    } else {
-      fileToUpload = new File([chunkFile as unknown as BlobPart], `part-${chunkIndex}`);
-    }
-
-    formData.append("document", fileToUpload);
+    const blob =
+      chunkFile instanceof Blob
+        ? chunkFile
+        : new Blob([chunkFile as unknown as BlobPart], {
+            type: "application/octet-stream",
+          });
+    // 强制以二进制分片文件名与 octet-stream 上传，防止 Telegram 将 .gif/.mp4 分片误判为动图/视频并转码破坏字节
+    const fileToUpload = new File([blob], partName, {
+      type: "application/octet-stream",
+    });
 
     const apiUrl = buildTgApiUrl(this.env.TG_BOT_TOKEN, "sendDocument");
+    const maxAttempts = 4;
 
-    // 添加超时控制
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const formData = new FormData();
+      formData.append("chat_id", this.env.TG_CHAT_ID);
+      formData.append("document", fileToUpload);
 
-    try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒超时
 
-      const result = await response.json();
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      if (!result.ok) {
-        throw new Error(
-          `Chunk ${chunkIndex} upload failed: ${result.description || "Unknown error"
-          }`,
-        );
-      }
+        const result: any = await response.json().catch(() => ({}));
 
-      const chunkId = result.result.document.file_id;
-      let thumbUrl: string | undefined;
+        if (response.ok && result?.ok) {
+          const chunkId =
+            result.result?.document?.file_id || getTgFileId(result);
+          if (!chunkId) {
+            throw new Error(`Chunk ${chunkIndex} missing file_id in Telegram response`);
+          }
 
-      // 尝试获取缩略图
-      if (chunkIndex === 0) {
-        const thumbFileId = getVideoThumbId(result);
-        if (thumbFileId) {
-          thumbUrl = `/file/${thumbFileId}/thumb`;
+          let thumbUrl: string | undefined;
+          if (chunkIndex === 0) {
+            const thumbFileId =
+              result.result?.document?.thumbnail?.file_id ||
+              result.result?.document?.thumb?.file_id ||
+              getVideoThumbId(result);
+            if (thumbFileId) {
+              thumbUrl = `/file/${thumbFileId}/thumb`;
+            }
+          }
+
+          return { chunkId, thumbUrl };
         }
-      }
 
-      return { chunkId, thumbUrl };
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error.name === "AbortError") {
-        throw new Error(`Chunk ${chunkIndex} upload timeout after 60s`);
+        const retryAfterSec =
+          typeof result?.parameters?.retry_after === "number"
+            ? result.parameters.retry_after
+            : undefined;
+        const shouldRetry =
+          attempt < maxAttempts - 1 &&
+          (response.status === 429 ||
+            response.status >= 500 ||
+            retryAfterSec !== undefined);
+
+        if (shouldRetry) {
+          const backoffMs = Math.min(25000, Math.pow(2, attempt) * 1200);
+          const waitMs =
+            retryAfterSec !== undefined
+              ? Math.max(backoffMs, retryAfterSec * 1000)
+              : backoffMs;
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+
+        throw new Error(
+          `Chunk ${chunkIndex} upload failed: ${result?.description || `HTTP ${response.status}`}`,
+        );
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (attempt < maxAttempts - 1 && error?.name !== "AbortError") {
+          const backoffMs = Math.min(15000, Math.pow(2, attempt) * 1200);
+          await new Promise((r) => setTimeout(r, backoffMs));
+          continue;
+        }
+        if (error?.name === "AbortError") {
+          throw new Error(`Chunk ${chunkIndex} upload timeout after 120s`);
+        }
+        throw error;
       }
-      throw error;
     }
+
+    throw new Error(`Chunk ${chunkIndex} upload exhausted retries`);
   }
 
   async get(key: string, req?: Request): Promise<Response> {

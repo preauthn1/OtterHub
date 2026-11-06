@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { listRoutes } from './file/list';
+import { importRoutes } from './file/import-legacy';
 import { downloadRoutes } from './file/download';
 import { rawRoutes } from './file/raw';
 import { thumbRoutes } from './file/thumb';
@@ -11,6 +12,7 @@ import type { Env } from '../types/hono';
 export const fileRoutes = new Hono<{ Bindings: Env }>();
 
 fileRoutes.route('/', listRoutes);
+fileRoutes.route('/import', importRoutes);
 fileRoutes.route('/', downloadRoutes);
 fileRoutes.route('/', rawRoutes);
 fileRoutes.route('/', thumbRoutes);

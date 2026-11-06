@@ -1,13 +1,12 @@
 import { DBAdapter } from ".";
-import { Chunk, chunkPrefix, FileMetadata, trashPrefix } from "@shared/types";
-import { extractKeyFromTrash, isUploadedChunk, streamToBlob } from "./shared-utils";
+import { Chunk, chunkPrefix, FileMetadata, trashPrefix, UploadedChunkResult } from "@shared/types";
+import { extractKeyFromTrash, isUploadedChunk } from "./shared-utils";
 import { getUniqueFileId } from "../file";
-import { TEMP_CHUNK_TTL } from "types";
 import { TRASH_EXPIRATION_TTL } from "@shared/types";
-import { fail } from "@utils/response";
+
 /**
  * 存储适配器基类
- * 提供通用的分片文件处理逻辑
+ * 提供通用的分片文件处理逻辑（已优化：去除临时 KV 双写与内存二次缓冲，直传目标存储）
  */
 export abstract class BaseAdapter implements DBAdapter {
   protected env: any;
@@ -18,7 +17,6 @@ export abstract class BaseAdapter implements DBAdapter {
     this.kvName = kvName;
   }
 
-  // 子类必须实现的方法
   abstract uploadFile(
     file: File | Blob | Uint8Array,
     metadata: FileMetadata,
@@ -36,9 +34,6 @@ export abstract class BaseAdapter implements DBAdapter {
 
   abstract delete(key: string): Promise<{ isDeleted: boolean }>;
 
-  /**
-   * 将文件移入回收站
-   */
   async moveToTrash(key: string): Promise<void> {
     const kv = this.env[this.kvName];
     const item = await this.getFileMetadataWithValue(key);
@@ -52,13 +47,9 @@ export abstract class BaseAdapter implements DBAdapter {
       expirationTtl: TRASH_EXPIRATION_TTL,
     });
 
-    // 从 KV 中删除原文件记录
     await kv.delete(key);
   }
 
-  /**
-   * 从回收站还原文件
-   */
   async restoreFromTrash(trashKey: string): Promise<void> {
     const kv = this.env[this.kvName];
     const { value, metadata } = await kv.getWithMetadata(trashKey);
@@ -72,13 +63,6 @@ export abstract class BaseAdapter implements DBAdapter {
     await kv.delete(trashKey);
   }
 
-  /**
-   * 子类必须实现的抽象方法：上传分片到目标存储
-   * @param chunkFile 要上传的分片文件
-   * @param parentKey 父文件的 key
-   * @param chunkIndex 分片索引
-   * @returns 上传后的分片 ID
-   */
   protected abstract uploadToTarget(
     chunkFile: File | Blob | Uint8Array,
     parentKey: string,
@@ -86,96 +70,6 @@ export abstract class BaseAdapter implements DBAdapter {
     fileName?: string,
   ): Promise<string | { chunkId: string; thumbUrl?: string }>;
 
-  /**
-   * 消费分片（模板方法）
-   * 流程：
-   * 1. 从临时 KV 读取分片内容
-   * 2. 将 stream 转换为 File
-   * 3. 调用子类的 uploadToTarget 上传
-   * 4. 更新 KV metadata
-   * 5. 删除临时 KV
-   *
-   * 子类只需实现 uploadToTarget，其他逻辑由基类处理
-   */
-  protected async consumeChunk(
-    parentKey: string,
-    tempChunkKey: string,
-    chunkIndex: number,
-    fileName?: string,
-  ): Promise<void> {
-    const kv = this.env[this.kvName];
-
-    try {
-      console.log(
-        `[consumeChunk] Processing chunk ${chunkIndex} for ${parentKey}`,
-      );
-
-      // 1. 从临时 KV 读取分片内容
-      const chunkStream = await kv.get(tempChunkKey, "stream");
-      if (!chunkStream) {
-        console.error(`[consumeChunk] Temp chunk not found: ${tempChunkKey}`);
-        return;
-      }
-
-      // 2. 将 stream 转换为 File
-      const chunkBlob = await streamToBlob(chunkStream);
-      const chunkFile = new File([chunkBlob], `part-${chunkIndex}`);
-
-      // 3. 调用子类实现的上传方法
-      const result = await this.uploadToTarget(
-        chunkFile,
-        parentKey,
-        chunkIndex,
-        fileName,
-      );
-
-      let chunkId: string;
-      let thumbUrl: string | undefined;
-
-      if (typeof result === "string") {
-        chunkId = result;
-      } else {
-        chunkId = result.chunkId;
-        thumbUrl = result.thumbUrl;
-      }
-
-      console.log(`[consumeChunk] Uploaded chunk ${chunkIndex}: ${chunkId}`);
-
-      // 4. 更新 KV metadata
-      await this.updateChunkInfo(
-        parentKey,
-        chunkIndex,
-        chunkId,
-        chunkFile.size,
-        thumbUrl,
-      );
-
-      // 5. 删除临时 KV
-      await kv.delete(tempChunkKey);
-
-      console.log(`[consumeChunk] Completed chunk ${chunkIndex}`);
-    } catch (error) {
-      console.error(
-        `[consumeChunk] Error processing chunk ${chunkIndex}:`,
-        error,
-      );
-      // 即使出错也要删除临时 KV，避免堆积
-      try {
-        await kv.delete(tempChunkKey);
-      } catch (e) {
-        // 忽略删除错误
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * 子类可选实现的方法：生成分片 ID
-   * 默认实现：使用父 key 的一部分生成简短 ID
-   * @param parentKey 父文件的 key
-   * @param chunkIndex 分片索引
-   * @returns 分片 ID
-   */
   protected getTempChunkId(parentKey: string, chunkIndex: number): string {
     const shortFileId =
       parentKey.split("_")[1]?.slice(0, 16) ||
@@ -184,23 +78,42 @@ export abstract class BaseAdapter implements DBAdapter {
   }
 
   /**
-   * 上传单个分片（通用实现）
-   * 流程：
-   * 1. 获取当前 metadata
-   * 2. 检查分片是否已上传
-   * 3. 将分片内容暂存到临时 KV
-   * 4. 异步处理：调用 consumeChunk（模板方法）
-   * 5. 使用 waitUntil 异步处理或直接等待
+   * 零 KV 写入的分片直传方法（推荐大文件通道）
+   * 直接将分片流式上传到 R2/Telegram 并返回分片凭证，最后由 /upload/chunk/complete 一次性写入 KV
+   */
+  async uploadChunkDirect(
+    key: string,
+    chunkIndex: number,
+    chunkFile: File | Blob,
+    fileName?: string,
+  ): Promise<UploadedChunkResult> {
+    const result = await this.uploadToTarget(
+      chunkFile,
+      key,
+      chunkIndex,
+      fileName,
+    );
+
+    const chunkId = typeof result === "string" ? result : result.chunkId;
+    const thumbUrl = typeof result === "string" ? undefined : result.thumbUrl;
+
+    return {
+      chunkIndex,
+      chunkId,
+      size: chunkFile.size,
+      ...(thumbUrl ? { thumbUrl } : {}),
+    };
+  }
+
+  /**
+   * 兼容旧版的单分片上传（不再写临时 KV，直接上传目标存储后更新元数据）
    */
   async uploadChunk(
     key: string,
     chunkIndex: number,
     chunkFile: File | Blob,
-    waitUntil?: (promise: Promise<any>) => void,
+    _waitUntil?: (promise: Promise<any>) => void,
   ): Promise<{ chunkIndex: number }> {
-    const kv = this.env[this.kvName];
-
-    // 1. 获取当前 metadata
     const item = await this.getFileMetadataWithValue(key);
     if (!item) {
       throw new Error("File not found");
@@ -211,40 +124,28 @@ export abstract class BaseAdapter implements DBAdapter {
       throw new Error("Not a chunked file");
     }
 
-    // 2. 检查分片是否已上传（使用通用工具函数）
-    const isUploaded = isUploadedChunk(metadata, chunkIndex);
-    if (isUploaded) {
+    if (isUploadedChunk(metadata, chunkIndex)) {
       return { chunkIndex };
     }
 
-    // 3. 将分片内容暂存到临时 KV（带过期时间）
-    const tempChunkKey = this.getTempChunkId(key, chunkIndex);
-    await kv.put(tempChunkKey, chunkFile.stream(), {
-      expirationTtl: TEMP_CHUNK_TTL,
-    });
-
-    // 4. 异步处理：使用模板方法 consumeChunk
-    const uploadPromise = this.consumeChunk(
+    const directResult = await this.uploadChunkDirect(
       key,
-      tempChunkKey,
       chunkIndex,
+      chunkFile,
       metadata.fileName,
     );
 
-    if (waitUntil) {
-      // 使用 waitUntil 异步处理，不阻塞响应
-      waitUntil(uploadPromise);
-    } else {
-      // 如果没有 waitUntil，直接等待（兼容性）
-      await uploadPromise;
-    }
+    await this.updateChunkInfo(
+      key,
+      chunkIndex,
+      directResult.chunkId,
+      directResult.size,
+      directResult.thumbUrl,
+    );
 
     return { chunkIndex };
   }
 
-  /**
-   * 获取上传进度（通用实现）
-   */
   async getProgress(key: string): Promise<{
     uploaded: number;
     total: number;
@@ -261,22 +162,20 @@ export abstract class BaseAdapter implements DBAdapter {
     }
 
     const { chunkInfo } = metadata;
-    const uploaded = chunkInfo.uploadedIndices?.length;
+    const uploaded = chunkInfo.uploadedIndices?.length || 0;
     const total = chunkInfo.total;
     const complete = uploaded === total;
 
     return { uploaded, total, complete };
   }
 
-  /**
-   * 获取文件元数据（公开方法，用于权限检查）
-   */
   public async getFileMetadataWithValue(key: string): Promise<{
     metadata: FileMetadata;
     value: string | null;
   } | null> {
     try {
       const item = await this.env[this.kvName].getWithMetadata(key);
+      if (!item || !item.metadata) return null;
       return { metadata: item.metadata, value: item.value };
     } catch (error) {
       console.error(`[getMetadata] Error for key ${key}:`, error);
@@ -284,9 +183,6 @@ export abstract class BaseAdapter implements DBAdapter {
     }
   }
 
-  /**
-   * 更新分片信息（使用重试机制避免并发冲突）
-   */
   protected async updateChunkInfo(
     key: string,
     chunkIndex: number,
@@ -295,11 +191,10 @@ export abstract class BaseAdapter implements DBAdapter {
     thumbUrl?: string,
   ): Promise<void> {
     const kv = this.env[this.kvName];
-    const maxRetries = 3;
+    const maxRetries = 4;
 
     for (let i = 0; i < maxRetries; i++) {
       try {
-        // 1. 获取最新状态
         const item = await this.getFileMetadataWithValue(key);
         if (!item) {
           throw new Error(`[updateChunkInfo] File not found: ${key}`);
@@ -310,51 +205,39 @@ export abstract class BaseAdapter implements DBAdapter {
           throw new Error(`[updateChunkInfo] No metadata/chunkInfo for key: ${key}`);
         }
 
-        const chunks: Chunk[] = value
-          ? JSON.parse(value)
-          : [];
+        const chunks: Chunk[] = value ? JSON.parse(value) : [];
 
-        // 2. 检查是否已上传
         if (metadata.chunkInfo.uploadedIndices?.includes(chunkIndex)) {
-          console.log(
-            `[updateChunkInfo] Chunk ${chunkIndex} already uploaded, skipping`,
-          );
           return;
         }
 
-        // 3. 更新 uploadedIndices
         if (!metadata.chunkInfo.uploadedIndices) {
           metadata.chunkInfo.uploadedIndices = [];
         }
         metadata.chunkInfo.uploadedIndices.push(chunkIndex);
+        metadata.chunkInfo.uploadedIndices.sort((a, b) => a - b);
 
-        // 4. 更新 chunks 数组（存储在 value 中）
-        chunks.push({
+        const filteredChunks = chunks.filter((c) => c.idx !== chunkIndex);
+        filteredChunks.push({
           idx: chunkIndex,
           file_id: chunkId,
           size: chunkSize,
         });
+        filteredChunks.sort((a, b) => a.idx - b.idx);
 
-        // 如果有缩略图且元数据中没有，则更新
         if (thumbUrl && !metadata.thumbUrl) {
           metadata.thumbUrl = thumbUrl;
         }
 
-        // 5. 写回 KV
-        await kv.put(key, JSON.stringify(chunks), { metadata });
-
-        console.log(
-          `[updateChunkInfo] Updated chunk ${chunkIndex} (attempt ${i + 1})`,
-        );
+        await kv.put(key, JSON.stringify(filteredChunks), { metadata });
         return;
       } catch (error) {
         console.error(`[updateChunkInfo] Attempt ${i + 1} failed:`, error);
         if (i === maxRetries - 1) {
           throw error;
         }
-        // 指数退避
         await new Promise((resolve) =>
-          setTimeout(resolve, Math.pow(2, i) * 100),
+          setTimeout(resolve, Math.pow(2, i) * 150),
         );
       }
     }
