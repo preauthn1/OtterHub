@@ -68,7 +68,6 @@ import {
 } from "@shared/types";
 import { isMobileBrowser } from "@/hooks/use-mobile";
 
-// 文件类型图标映射
 const typeIcons: Record<FileType, typeof ImageIcon> = {
   [FileType.Image]: ImageIcon,
   [FileType.Audio]: Music,
@@ -77,7 +76,6 @@ const typeIcons: Record<FileType, typeof ImageIcon> = {
   [FileType.Trash]: Trash2,
 };
 
-// 文件类型名称映射
 const typeNames: Record<FileType, string> = {
   [FileType.Image]: "图片",
   [FileType.Audio]: "音频",
@@ -99,7 +97,6 @@ export function BatchOperationsBar() {
     itemsPerPage,
   } = useFileUIStore();
 
-  // ===== 跨类型选中管理 =====
   const activeSelectedKeys = useActiveSelectedKeys();
   const totalSelectedKeys = useTotalSelectedKeys();
   const selectedStats = useSelectedStats();
@@ -124,8 +121,6 @@ export function BatchOperationsBar() {
 
   const filteredFiles = useFilteredFiles();
 
-  // ===== 跨类型文件数据 =====
-  // 获取所有类型的文件并构建 Map
   const allItems = useMemo(() => {
     return Object.values(buckets).flatMap((bucket) => bucket.items);
   }, [buckets]);
@@ -134,20 +129,16 @@ export function BatchOperationsBar() {
     return new Map(allItems.map((f) => [f.name, f]));
   }, [allItems]);
 
-  // 获取所有选中的文件（跨类型）
   const selectedItems = useMemo(() => {
     return totalSelectedKeys
       .map((key) => allItemMap.get(key))
       .filter(Boolean) as typeof allItems;
   }, [totalSelectedKeys, allItemMap]);
 
-  // 当前类型的选中统计
   const currentCount = activeSelectedKeys.length;
   const totalCount = totalSelectedKeys.length;
   const hasCrossTypeSelection = totalCount > currentCount;
 
-  /** ===== 派生数据 ===== */
-  // 当前页显示的文件
   const currentFiles = useMemo(() => {
     if (viewMode === ViewMode.Masonry) return filteredFiles;
     const offset = currentPage * itemsPerPage;
@@ -156,16 +147,15 @@ export function BatchOperationsBar() {
 
   const activeSelectedSet = useMemo(
     () => new Set(activeSelectedKeys),
-    [activeSelectedKeys]
+    [activeSelectedKeys],
   );
 
   const isAllSelected =
     currentFiles.length > 0 &&
     currentFiles.every((file) => activeSelectedSet.has(file.name));
 
-  /** ===== 批量标签成功回调 ===== */
   const handleBatchTagSuccess = (
-    updatedFiles: Array<{ name: string; tags: FileTag[] }>
+    updatedFiles: Array<{ name: string; tags: FileTag[] }>,
   ) => {
     updatedFiles.forEach(({ name, tags }) => {
       const file = allItemMap.get(name);
@@ -178,9 +168,8 @@ export function BatchOperationsBar() {
     });
   };
 
-  /** ===== 批量重命名成功回调 ===== */
   const handleBatchRenameSuccess = (
-    updatedFiles: Array<{ name: string; fileName: string }>
+    updatedFiles: Array<{ name: string; fileName: string }>,
   ) => {
     updatedFiles.forEach(({ name, fileName }) => {
       const file = allItemMap.get(name);
@@ -193,10 +182,9 @@ export function BatchOperationsBar() {
     });
   };
 
-  /** ===== 开始批量下载 ===== */
   const startBatchDownload = async (
     files: Array<{ key: string; metadata: FileMetadata }>,
-    dirHandleResult?: DirectoryHandleResult
+    dirHandleResult?: DirectoryHandleResult,
   ) => {
     const toastId = toast.loading(`准备下载 ${files.length} 个文件...`);
     let downloadDirName: string | null = null;
@@ -219,9 +207,7 @@ export function BatchOperationsBar() {
             : "下载中";
           toast.loading(
             `${prefix} (${index + 1}/${files.length}): ${fileName}`,
-            {
-              id: toastId,
-            }
+            { id: toastId },
           );
         },
         onFileComplete: (index: number, fileName: string, success: boolean) => {
@@ -236,18 +222,17 @@ export function BatchOperationsBar() {
         : await downloadFiles(downloadOptions);
 
       if (result.cancelled > 0) {
-        toast.info(`下载已取消`, { id: toastId });
+        toast.info("下载已取消", { id: toastId });
       } else if (result.failed === 0) {
         toast.success(`成功下载 ${result.success} 个文件`, { id: toastId });
       } else {
-        toast.warning(`部分文件下载失败`, {
+        toast.warning("部分文件下载失败", {
           id: toastId,
           description: `成功 ${result.success} 个，失败 ${result.failed} 个`,
         });
       }
     } catch (error) {
       if (error instanceof Error && error.message === "NO_DIRECTORY_HANDLE") {
-        // 需要显示引导弹窗
         toast.dismiss(toastId);
         setPendingDownloadFiles(files);
         setShowDirGuide(true);
@@ -257,17 +242,13 @@ export function BatchOperationsBar() {
     }
   };
 
-  /** ===== 处理目录选择 ===== */
   const handleDirectorySelected = async (dirResult: DirectoryHandleResult) => {
     setShowDirGuide(false);
-
     if (!pendingDownloadFiles) return;
-
     await startBatchDownload(pendingDownloadFiles, dirResult);
     setPendingDownloadFiles(null);
   };
 
-  /** ===== 批量下载（跨类型） ===== */
   const handleBatchDownload = async () => {
     if (totalSelectedKeys.length === 0) return;
 
@@ -300,7 +281,7 @@ export function BatchOperationsBar() {
               ? `下载到 ${progress.dirName}: ${metadata.fileName} (${progress.percentage}%)`
               : `下载中: ${metadata.fileName} (${progress.percentage}%)`;
             toast.loading(message, { id: toastId });
-          }
+          },
         );
         if (result.status === "cancelled") {
           toast.dismiss(toastId);
@@ -330,13 +311,10 @@ export function BatchOperationsBar() {
       return;
     }
 
-    // 开始批量下载（可能显示引导弹窗）
     await startBatchDownload(files);
   };
 
-  /** ===== 批量删除（跨类型） ===== */
   const handleBatchDelete = async () => {
-    // 构建确认信息，包含各类型统计
     const statsText = selectedStats
       .map((s) => `${typeNames[s.type]}:${s.count}`)
       .join("，");
@@ -371,22 +349,20 @@ export function BatchOperationsBar() {
             id: toastId,
           });
         },
-        10
+        10,
       );
 
-      // 更新本地状态
       successful.forEach((key) => {
         const item = allItemMap.get(key);
         if (item) moveToTrashLocal(item);
       });
 
-      // 从所有类型的选中中移除成功的文件
       removeSelectionFromAllTypes(successful);
 
       if (failed.length === 0) {
         toast.success(`成功删除 ${successful.length} 个文件`, { id: toastId });
       } else {
-        toast.error(`部分文件删除失败`, {
+        toast.error("部分文件删除失败", {
           id: toastId,
           description: `${failed.length} 个文件删除失败，成功删除 ${successful.length} 个`,
         });
@@ -399,9 +375,7 @@ export function BatchOperationsBar() {
     }
   };
 
-  /** ===== 批量彻底删除（跨类型） ===== */
   const handleBatchPermanentDelete = async () => {
-    // 构建确认信息，包含各类型统计
     const statsText = selectedStats
       .map((s) => `${typeNames[s.type]}:${s.count}`)
       .join("，");
@@ -436,14 +410,13 @@ export function BatchOperationsBar() {
             id: toastId,
           });
         },
-        10
+        10,
       );
 
       if (successful.length > 0) {
         deleteFilesLocal(successful);
       }
 
-      // 从所有类型的选中中移除成功的文件
       removeSelectionFromAllTypes(successful);
 
       if (failed.length === 0) {
@@ -451,7 +424,7 @@ export function BatchOperationsBar() {
           id: toastId,
         });
       } else {
-        toast.error(`部分文件删除失败`, {
+        toast.error("部分文件删除失败", {
           id: toastId,
           description: `${failed.length} 个文件彻底删除失败，成功删除 ${successful.length} 个`,
         });
@@ -464,7 +437,6 @@ export function BatchOperationsBar() {
     }
   };
 
-  /** ===== 批量复制（跨类型） ===== */
   const handleBatchCopy = async () => {
     const urls = totalSelectedKeys
       .map((key) => {
@@ -480,7 +452,6 @@ export function BatchOperationsBar() {
     toast.success(`已复制 ${urls.length} 个文件链接`);
   };
 
-  /** ===== 类型统计标签组件 ===== */
   const TypeBadge = ({
     type,
     count,
@@ -494,7 +465,7 @@ export function BatchOperationsBar() {
     return (
       <Badge
         variant="secondary"
-        className="group gap-1 bg-white/20 text-primary-foreground border-none cursor-pointer transition-colors"
+        className="group gap-1 bg-secondary text-foreground border border-border cursor-pointer font-mono tabular-nums"
         onClick={onClear}
         title={`清空选中「${typeNames[type]}」`}
       >
@@ -505,17 +476,14 @@ export function BatchOperationsBar() {
     );
   };
 
-  /** ===== UI ===== */
   return (
     <>
-      <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4 w-[calc(100%-2rem)] max-w-max">
-        <div className="flex items-center gap-2 md:gap-4 rounded-full border border-glass-border bg-linear-to-r from-primary/90 to-accent/90 px-4 md:px-6 py-2.5 md:py-3 shadow-2xl backdrop-blur-xl">
-          {/* 选中统计 */}
+      <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 w-[calc(100%-2rem)] max-w-max">
+        <div className="flex items-center gap-2 md:gap-3 rounded-[var(--r-md)] border border-border bg-card px-4 py-2.5 shadow-lg">
           <div className="flex items-center gap-2">
-            <span className="text-xs md:text-sm font-medium text-primary-foreground whitespace-nowrap">
-              选中 {totalCount} 项
+            <span className="text-xs md:text-sm font-mono font-medium text-foreground whitespace-nowrap tabular-nums">
+              已选 {totalCount} 项
             </span>
-            {/* 跨类型统计标签 */}
             {selectedStats.length > 0 && (
               <div className="hidden md:flex items-center gap-1">
                 {selectedStats.map(({ type, count }) => (
@@ -530,38 +498,32 @@ export function BatchOperationsBar() {
             )}
           </div>
 
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="h-5 w-px bg-border mx-0.5" />
+
+          <div className="flex items-center gap-1.5">
             <Button
               size="sm"
-              variant="ghost"
-              className="text-primary-foreground hover:bg-primary-foreground/10 px-2 md:px-3"
               onClick={handleBatchDownload}
               title="下载"
             >
-              <Download className="md:mr-2 h-4 w-4" />
-              <span className="hidden md:inline">下载</span>
+              <Download className="h-4 w-4" />
+              <span className="hidden md:inline">批量下载</span>
             </Button>
 
             <Button
               size="sm"
-              variant="ghost"
-              className="text-primary-foreground hover:bg-primary-foreground/10 px-2 md:px-3"
+              variant="outline"
+              className="text-destructive hover:text-destructive"
               onClick={handleBatchDelete}
               title="删除"
             >
-              <Trash2 className="md:mr-2 h-4 w-4 text-red-400" />
-              <span className="hidden md:inline">删除</span>
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden md:inline">移入回收站</span>
             </Button>
-
-            <div className="h-6 w-px bg-primary-foreground/20 mx-1" />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                >
+                <Button size="icon-sm" variant="outline" title="更多批量操作">
                   <Toolbox className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -569,7 +531,7 @@ export function BatchOperationsBar() {
               <DropdownMenuContent
                 align="end"
                 side="top"
-                className="min-w-[180px] border-glass-border bg-popover"
+                className="min-w-[180px] border-border bg-popover"
               >
                 <DropdownMenuItem
                   onClick={() => {
@@ -580,26 +542,19 @@ export function BatchOperationsBar() {
                       addSelection(names, activeType);
                     }
                   }}
-                  className="cursor-pointer text-foreground hover:bg-secondary/50"
                 >
-                  <Check className="mr-2 h-4 w-4 text-blue-400" />
+                  <Check className="mr-2 h-4 w-4 text-muted-foreground" />
                   {isAllSelected ? "取消本页全选" : "全选当前页"}
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={() => setShowBatchTags(true)}
-                  className="cursor-pointer text-foreground hover:bg-secondary/50"
-                >
-                  <Tag className="mr-2 h-4 w-4 text-blue-400" />
+                <DropdownMenuItem onClick={() => setShowBatchTags(true)}>
+                  <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
                   编辑标签
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={() => setShowBatchRename(true)}
-                  className="cursor-pointer text-foreground hover:bg-secondary/50"
-                >
-                  <FilePen className="mr-2 h-4 w-4 text-blue-400" />
-                  重命名
+                <DropdownMenuItem onClick={() => setShowBatchRename(true)}>
+                  <FilePen className="mr-2 h-4 w-4 text-muted-foreground" />
+                  批量重命名
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
@@ -610,36 +565,31 @@ export function BatchOperationsBar() {
                     }
                     setShowBatchShare(true);
                   }}
-                  className="cursor-pointer text-foreground hover:bg-secondary/50"
                 >
-                  <Share2 className="mr-2 h-4 w-4 text-blue-400" />
+                  <Share2 className="mr-2 h-4 w-4 text-muted-foreground" />
                   打包分享
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={handleBatchCopy}
-                  className="cursor-pointer text-foreground hover:bg-secondary/50"
-                >
-                  <Copy className="mr-2 h-4 w-4 text-blue-400" />
-                  复制链接
+                <DropdownMenuItem onClick={handleBatchCopy}>
+                  <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
+                  复制直链
                 </DropdownMenuItem>
 
                 <div className="my-1 h-px bg-border" />
 
                 <DropdownMenuItem
                   onClick={handleBatchPermanentDelete}
-                  className="cursor-pointer text-red-500 hover:bg-red-50 focus:text-red-500 focus:bg-red-50"
+                  className="text-destructive focus:text-destructive"
                 >
-                  <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
                   彻底删除
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <Button
-              size="sm"
+              size="icon-sm"
               variant="ghost"
-              className="text-primary-foreground hover:bg-primary-foreground/10"
               onClick={clearAllSelection}
               title="清空全部选中"
             >

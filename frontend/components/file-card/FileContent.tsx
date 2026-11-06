@@ -1,8 +1,4 @@
-import {
-  Music,
-  Video,
-  FileText,
-} from "lucide-react";
+import { Music, Video, FileText } from "lucide-react";
 import { shouldBlur, shouldLoadImage, cn } from "@/lib/utils";
 import { getFileUrl } from "@/lib/api";
 import { FileTag, FileType } from "@shared/types";
@@ -10,7 +6,7 @@ import { FileImagePreview } from "../FileImagePreview";
 import { ImageLoadMode } from "@/lib/types";
 import { useGeneralSettingsStore } from "@/stores/general-store";
 
-export const ICON_DISPLAY_SIZE = "h-18 w-18";
+export const ICON_DISPLAY_SIZE = "h-14 w-14";
 
 interface FileContentProps {
   fileType: FileType;
@@ -37,7 +33,9 @@ export function FileContent({
   className,
   imgSrc,
 }: FileContentProps) {
-  const dataSaverThreshold = useGeneralSettingsStore((s) => s.dataSaverThreshold);
+  const dataSaverThreshold = useGeneralSettingsStore(
+    (s) => s.dataSaverThreshold,
+  );
   const blur = shouldBlur({ safeMode, tags });
   const load = shouldLoadImage({
     fileType,
@@ -60,7 +58,6 @@ export function FileContent({
   }
 
   if (fileType === FileType.Video) {
-    // 如果有缩略图，显示缩略图
     if (thumbUrl) {
       return (
         <img
@@ -69,18 +66,18 @@ export function FileContent({
           loading="lazy"
           decoding="async"
           className={cn(
-            "w-full h-full object-cover transition-all duration-300",
-            blur ? "blur-xl scale-110" : "blur-0 scale-100"
+            "w-full h-full object-cover",
+            blur ? "blur-xl scale-110" : "blur-0 scale-100",
           )}
         />
       );
     }
-    return <Video className={`text-purple-300 ${className}`} />;
+    return <Video className={`text-teal-500 ${className}`} />;
   }
 
   if (fileType === FileType.Audio) {
-    return <Music className={`text-emerald-300 ${className}`} />;
+    return <Music className={`text-emerald-500 ${className}`} />;
   }
 
-  return <FileText className={`text-amber-300 ${className}`} />;
+  return <FileText className={`text-amber-500 ${className}`} />;
 }

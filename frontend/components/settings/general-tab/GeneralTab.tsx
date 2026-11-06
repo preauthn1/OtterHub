@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ShieldCheck,
   Eye,
+  EyeOff,
   CloudSync,
   CloudUpload,
   Info,
@@ -16,6 +17,11 @@ import {
   AlertCircle,
   Sparkles,
   Webhook,
+  KeyRound,
+  Copy,
+  Check,
+  ExternalLink,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,26 +47,39 @@ import { TagSelector } from "@/components/TagSelector";
 import { SafeModeToggle } from "@/components/SafeModeToggle";
 import { ImageLoadModeToggle } from "@/components/ImageLoadModeToggle";
 import { ImageLoadMode } from "@shared/types";
-import { telegramWebhookApi } from "@/lib/api/telegram";
+import {
+  telegramOAuthApi,
+  TelegramOAuthConfigInfo,
+  telegramWebhookApi,
+} from "@/lib/api/telegram";
 
-const SettingCard = ({ icon: Icon, iconColor, title, desc, children }: any) => (
-  <Card className="border border-border/40 shadow-sm bg-muted/10 backdrop-blur-sm rounded-2xl overflow-hidden">
-    <CardHeader>
-      <div className="flex items-center gap-2">
-        <Icon className={`h-4 w-4 ${iconColor}`} />
-        <CardTitle className="text-base">{title}</CardTitle>
+const SettingCard = ({ icon: Icon, iconColor, title, desc, badge, children }: any) => (
+  <Card className="border border-border bg-card rounded-[var(--r-md)] shadow-none overflow-hidden py-5 gap-4">
+    <CardHeader className="px-5 pb-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${iconColor}`} />
+          <CardTitle className="text-base font-semibold text-foreground">
+            {title}
+          </CardTitle>
+        </div>
+        {badge}
       </div>
-      {desc && <CardDescription>{desc}</CardDescription>}
+      {desc && (
+        <CardDescription className="text-xs text-muted-foreground mt-1">
+          {desc}
+        </CardDescription>
+      )}
     </CardHeader>
-    <CardContent className="grid gap-4">{children}</CardContent>
+    <CardContent className="px-5 grid gap-4">{children}</CardContent>
   </Card>
 );
 
 const SettingItem = ({ title, desc, children }: any) => (
-  <div className="flex items-center justify-between">
-    <div className="space-y-0.5">
-      <Label className="text-sm font-medium">{title}</Label>
-      {desc && <p className="text-[11px] text-muted-foreground">{desc}</p>}
+  <div className="flex items-center justify-between gap-4">
+    <div className="space-y-0.5 text-left">
+      <Label className="text-sm font-medium text-foreground">{title}</Label>
+      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
     </div>
     {children}
   </div>
@@ -68,20 +87,20 @@ const SettingItem = ({ title, desc, children }: any) => (
 
 const HintBox = ({ icon: Icon = Info, variant = "default", children }: any) => {
   const styles = {
-    default: "bg-muted/30 border-border/20 text-muted-foreground",
+    default: "bg-secondary border-border text-muted-foreground",
     warning:
-      "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400",
-    info: "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400",
+      "bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-300",
+    info: "bg-sky-500/15 border-sky-500/40 text-sky-800 dark:text-sky-300",
   };
   return (
     <div
       className={cn(
-        "flex items-start gap-1.5 p-1.5 rounded-lg border text-xs leading-relaxed",
+        "flex items-start gap-2 p-2.5 rounded-[var(--r-sm)] border text-xs leading-relaxed text-left",
         styles[variant as keyof typeof styles]
       )}
     >
-      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-80" />
-      <div>{children}</div>
+      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+      <div className="flex-1">{children}</div>
     </div>
   );
 };
@@ -90,7 +109,6 @@ interface GeneralTabProps {
   onGeneralSettingsSnapshotReset?: () => void;
 }
 
-// --- 主组件 ---
 export function GeneralTab({
   onGeneralSettingsSnapshotReset,
 }: GeneralTabProps) {
@@ -109,7 +127,31 @@ export function GeneralTab({
   const [supportsFsApi, setSupportsFsApi] = useState(false);
   const dataSaverThreshold = store?.dataSaverThreshold;
 
-  // 初始化 FsApi & 读取目录
+  // Telegram Web OAuth 配置状态
+  const [oauthInfo, setOauthInfo] = useState<TelegramOAuthConfigInfo | null>(
+    null
+  );
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false);
+  const [isSavingOAuth, setIsSavingOAuth] = useState(false);
+  const [oauthEnabled, setOauthEnabled] = useState(true);
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthClientSecret, setOauthClientSecret] = useState("");
+  const [showOAuthSecret, setShowOAuthSecret] = useState(false);
+  const [oauthAllowedUsers, setOauthAllowedUsers] = useState("");
+  const [oauthRedirectUri, setOauthRedirectUri] = useState("");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const applyOAuthInfoToForm = (info: TelegramOAuthConfigInfo) => {
+    setOauthInfo(info);
+    setOauthEnabled(info.enabled);
+    setOauthClientId(info.clientId || "");
+    setOauthClientSecret("");
+    setOauthAllowedUsers(info.allowedUserIds || "");
+    setOauthRedirectUri(
+      info.redirectSource === "kv" ? info.redirectUri : ""
+    );
+  };
+
   useEffect(() => {
     const isSupported =
       typeof window !== "undefined" && "showDirectoryPicker" in window;
@@ -121,34 +163,44 @@ export function GeneralTab({
     }
   }, []);
 
-  // 组件挂载时自动检查 Telegram Webhook 状态（如果尚未检查过）
   const hasCheckedWebhookRef = useRef(false);
   useEffect(() => {
-    if (!store || telegramWebhookInfo !== null || hasCheckedWebhookRef.current)
-      return;
-
+    if (!store || hasCheckedWebhookRef.current) return;
     hasCheckedWebhookRef.current = true;
-    const checkWebhook = async () => {
-      setIsCheckingTelegramWebhook(true);
+
+    const loadTelegramStates = async () => {
+      if (telegramWebhookInfo === null) {
+        setIsCheckingTelegramWebhook(true);
+        try {
+          const info = await telegramWebhookApi.getInfo();
+          store.setTelegramWebhookInfo(info);
+        } catch {
+          // ignore
+        } finally {
+          setIsCheckingTelegramWebhook(false);
+        }
+      }
+
+      setIsLoadingOAuth(true);
       try {
-        const info = await telegramWebhookApi.getInfo();
-        store.setTelegramWebhookInfo(info);
+        const cfg = await telegramOAuthApi.getConfig();
+        applyOAuthInfoToForm(cfg);
       } catch {
-        // 静默失败，不打扰用户
+        // ignore
       } finally {
-        setIsCheckingTelegramWebhook(false);
+        setIsLoadingOAuth(false);
       }
     };
 
-    checkWebhook();
+    loadTelegramStates();
   }, [store, telegramWebhookInfo]);
 
-  // 阈值防抖同步
   useEffect(() => {
     if (dataSaverThreshold !== undefined) {
       setLocalThreshold(dataSaverThreshold.toString());
     }
   }, [dataSaverThreshold]);
+
   useEffect(() => {
     if (!store) return;
     const threshold = parseFloat(localThreshold);
@@ -158,6 +210,7 @@ export function GeneralTab({
       threshold === store.dataSaverThreshold
     )
       return;
+
     const timer = setTimeout(() => store.setDataSaverThreshold(threshold), 500);
     return () => clearTimeout(timer);
   }, [
@@ -167,22 +220,18 @@ export function GeneralTab({
     store,
   ]);
 
-  // 异步操作工厂函数
   const withLoading =
     (
       action: () => Promise<any>,
       setLoader: (val: boolean) => void,
-      successMsg?: string,
       errorMsg?: string
     ) =>
     async () => {
       setLoader(true);
       try {
-        const res = await action();
-        // if (successMsg) toast.success(successMsg);
-        return res;
-      } catch {
-        if (errorMsg) toast.error(errorMsg);
+        return await action();
+      } catch (err: any) {
+        if (errorMsg) toast.error(err?.message || errorMsg);
       } finally {
         setLoader(false);
       }
@@ -197,7 +246,6 @@ export function GeneralTab({
       }
     },
     setIsDirLoading,
-    undefined,
     "更换失败"
   );
 
@@ -205,41 +253,32 @@ export function GeneralTab({
     async () => {
       await clearDirectoryHandleCache();
       setCurrentDir(null);
+      toast.success("已清除，下次下载需重新选择目录");
     },
     setIsDirLoading,
-    "已清除，下次下载需重新选择目录",
     "清除失败"
   );
 
-  // 手动同步到云端，成功后更新快照避免退出时重复触发
   const handleManualSync = withLoading(
     async () => {
       if (!store) return;
       await store.syncSettings();
-      // 成功后更新快照，避免退出时重复触发自动同步
       onGeneralSettingsSnapshotReset?.();
     },
     setIsUploading,
-    "保存成功",
     "保存失败"
   );
 
-  // 从云端恢复，成功后更新快照
   const handleFetchFromCloud = withLoading(
     async () => {
       if (!store) return;
       await store.fetchSettings();
-      // 恢复成功后更新快照，避免退出时误触发同步
       onGeneralSettingsSnapshotReset?.();
     },
     setIsSyncing,
-    "恢复成功",
     "恢复失败"
   );
 
-  /**
-   * 读取 Telegram webhook 当前绑定状态。
-   */
   const handleCheckTelegramWebhook = withLoading(
     async () => {
       const info = await telegramWebhookApi.getInfo();
@@ -251,13 +290,9 @@ export function GeneralTab({
       }
     },
     setIsCheckingTelegramWebhook,
-    undefined,
     "检查失败"
   );
 
-  /**
-   * 让后端使用环境变量配置 Telegram webhook。
-   */
   const handleSetupTelegramWebhook = withLoading(
     async () => {
       const result = await telegramWebhookApi.setup();
@@ -268,27 +303,71 @@ export function GeneralTab({
       toast.success("Telegram Webhook 已配置");
     },
     setIsSettingTelegramWebhook,
-    undefined,
     "配置失败"
   );
 
-  // SSR 安全处理 - 放在所有 hooks 之后
+  const handleSaveTelegramOAuth = withLoading(
+    async () => {
+      const updated = await telegramOAuthApi.saveConfig({
+        enabled: oauthEnabled,
+        clientId: oauthClientId.trim(),
+        clientSecret: oauthClientSecret.trim() || undefined,
+        allowedUserIds: oauthAllowedUsers.trim(),
+        redirectUri: oauthRedirectUri.trim(),
+      });
+      applyOAuthInfoToForm(updated);
+      toast.success(
+        updated.configured
+          ? "Telegram Web OAuth 配置已生效"
+          : "配置已保存（仍缺少必填项，请检查 Client Secret 或用户 ID）"
+      );
+    },
+    setIsSavingOAuth,
+    "保存 Telegram OAuth 配置失败"
+  );
+
+  const handleResetTelegramOAuth = withLoading(
+    async () => {
+      const updated = await telegramOAuthApi.resetConfig();
+      applyOAuthInfoToForm(updated);
+      toast.success("已恢复为环境变量默认配置");
+    },
+    setIsSavingOAuth,
+    "重置失败"
+  );
+
+  const copyText = (key: string, text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(key);
+    toast.success("已复制到剪贴板");
+    setTimeout(() => setCopiedField(null), 1800);
+  };
+
   if (!store) {
     return (
       <div className="flex flex-col h-full items-center justify-center text-muted-foreground">
-        <div className="animate-pulse">加载设置中...</div>
+        <div>加载设置中...</div>
       </div>
     );
   }
 
+  const resolvedOrigin =
+    oauthInfo?.origin ||
+    (typeof window !== "undefined" ? window.location.origin : "");
+  const resolvedCallbackUrl =
+    oauthInfo?.redirectUri || `${resolvedOrigin}/auth/telegram/callback`;
+
   return (
     <div className="flex flex-col h-full overflow-y-auto custom-scrollbar space-y-6 pr-2">
-      {/* 头部区域 */}
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight">常规设置</h2>
-          <p className="text-sm text-muted-foreground">
-            更改自动保存，可手动同步到云端
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="text-left">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            常规设置
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            管理浏览偏好、Telegram Web OAuth 联合登录、频道上传与本地目录
           </p>
         </div>
         <div className="flex gap-2">
@@ -297,44 +376,311 @@ export function GeneralTab({
             size="sm"
             onClick={handleFetchFromCloud}
             disabled={isSyncing}
-            className="rounded-xl h-9"
           >
             <CloudSync
-              className={cn("h-4 w-4 mr-2", isSyncing && "animate-spin")}
+              className={cn("h-4 w-4", isSyncing && "animate-spin")}
             />
-            从云端恢复
+            <span>从云端恢复</span>
           </Button>
           <Button
             size="sm"
             onClick={handleManualSync}
             disabled={isUploading}
-            className="rounded-xl h-9 shadow-sm"
           >
             <CloudUpload
-              className={cn("h-4 w-4 mr-2", isUploading && "animate-spin")}
+              className={cn("h-4 w-4", isUploading && "animate-spin")}
             />
-            保存到云端
+            <span>保存到云端</span>
           </Button>
         </div>
       </div>
 
-      <Separator className="opacity-50" />
+      <Separator />
 
-      <div className="grid gap-6">
-        {/* 1. 浏览设置 */}
-        <SettingCard icon={Eye} iconColor="text-blue-500" title="浏览设置">
+      <div className="grid gap-5">
+        {/* 1. Telegram Web OAuth 登录配置 */}
+        <SettingCard
+          icon={KeyRound}
+          iconColor="taste-accent-text"
+          title="Telegram Web OAuth 联合登录"
+          desc="支持通过 @BotFather Web Login (OpenID Connect + PKCE) 免密登录云盘；可直接使用环境变量或在此加密保存覆盖配置。"
+          badge={
+            <span
+              className={cn(
+                "inline-flex items-center rounded-[4px] border px-2 py-0.5 text-xs font-mono",
+                oauthInfo?.configured
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                  : "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300"
+              )}
+            >
+              {isLoadingOAuth
+                ? "检测中..."
+                : oauthInfo?.configured
+                  ? `已就绪 (${oauthInfo.source === "kv" ? "在线配置" : oauthInfo.source === "mixed" ? "混合配置" : "环境变量"})`
+                  : "待配置"}
+            </span>
+          }
+        >
+          <div className="space-y-4 text-left">
+            {/* BotFather Web Login 参数一键复制 */}
+            <div className="rounded-[var(--r-sm)] border border-border bg-secondary/60 p-3.5 space-y-2.5">
+              <p className="text-xs font-medium text-foreground">
+                1. 在 Telegram 打开 <span className="font-mono">@BotFather</span>{" "}
+                → 发送 <span className="font-mono">/mybots</span> → 选择你的 Bot
+                → <span className="font-mono">Bot Settings</span> →{" "}
+                <span className="font-mono">Web Login</span>，填入以下回调参数：
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <div className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] border border-border bg-card px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-muted-foreground">
+                      站点域名 (Origin / Domain)
+                    </p>
+                    <p className="text-xs font-mono text-foreground truncate">
+                      {resolvedOrigin}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => copyText("origin", resolvedOrigin)}
+                    title="复制域名"
+                  >
+                    {copiedField === "origin" ? (
+                      <Check className="h-3.5 w-3.5 taste-accent-text" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] border border-border bg-card px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-muted-foreground">
+                      回调地址 (Redirect URL)
+                    </p>
+                    <p className="text-xs font-mono text-foreground truncate">
+                      {resolvedCallbackUrl}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => copyText("callback", resolvedCallbackUrl)}
+                    title="复制回调地址"
+                  >
+                    {copiedField === "callback" ? (
+                      <Check className="h-3.5 w-3.5 taste-accent-text" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* OAuth 在线配置表单 */}
+            <div className="space-y-3.5">
+              <SettingItem
+                title="启用 Telegram 账号登录"
+                desc="开启后登录页可使用 Sign in with Telegram 一键鉴权"
+              >
+                <Switch
+                  checked={oauthEnabled}
+                  onCheckedChange={setOauthEnabled}
+                />
+              </SettingItem>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-foreground">
+                      Client ID (Bot ID)
+                    </Label>
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      {oauthInfo?.clientIdSource === "bot_token"
+                        ? "已从 TG_BOT_TOKEN 自动提取"
+                        : oauthInfo?.clientIdSource === "env"
+                          ? "来自环境变量"
+                          : oauthInfo?.clientIdSource === "kv"
+                            ? "在线配置"
+                            : "必填"}
+                    </span>
+                  </div>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={oauthClientId}
+                    onChange={(e) => setOauthClientId(e.target.value)}
+                    placeholder={
+                      oauthInfo?.envHints?.botTokenClientId ||
+                      "纯数字 Bot ID，如 123456789"
+                    }
+                    className="h-9 font-mono text-xs bg-background border-border"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-foreground">
+                      Client Secret (TG_OIDC_SECRET)
+                    </Label>
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      {oauthInfo?.hasClientSecret
+                        ? oauthInfo.secretSource === "kv"
+                          ? "已加密保存 (KV)"
+                          : "已从环境变量加载"
+                        : "未设置密钥"}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type={showOAuthSecret ? "text" : "password"}
+                      value={oauthClientSecret}
+                      onChange={(e) => setOauthClientSecret(e.target.value)}
+                      placeholder={
+                        oauthInfo?.hasClientSecret
+                          ? "已配置密钥（留空保持不变，输入新值可覆盖）"
+                          : "粘贴 BotFather Web Login 生成的 Client Secret"
+                      }
+                      className="h-9 pr-9 font-mono text-xs bg-background border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOAuthSecret((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      aria-label={showOAuthSecret ? "隐藏密钥" : "显示密钥"}
+                    >
+                      {showOAuthSecret ? (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-foreground">
+                      允许登录的 Telegram 用户 ID
+                    </Label>
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      {oauthInfo?.allowedUserSource === "chat_id"
+                        ? "继承自 TG_CHAT_ID"
+                        : oauthInfo?.allowedUserSource === "env"
+                          ? "来自环境变量"
+                          : oauthInfo?.allowedUserSource === "kv"
+                            ? "在线配置"
+                            : "必填"}
+                    </span>
+                  </div>
+                  <Input
+                    type="text"
+                    value={oauthAllowedUsers}
+                    onChange={(e) => setOauthAllowedUsers(e.target.value)}
+                    placeholder="个人数字 User ID（多个用逗号分隔）"
+                    className="h-9 font-mono text-xs bg-background border-border"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-foreground">
+                      自定义 Redirect URI（可选）
+                    </Label>
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      留空默认当前域名回调
+                    </span>
+                  </div>
+                  <Input
+                    type="url"
+                    value={oauthRedirectUri}
+                    onChange={(e) => setOauthRedirectUri(e.target.value)}
+                    placeholder={
+                      oauthInfo?.defaultCallbackUri ||
+                      `${resolvedOrigin}/auth/telegram/callback`
+                    }
+                    className="h-9 font-mono text-xs bg-background border-border"
+                  />
+                </div>
+              </div>
+
+              {oauthInfo?.envHints?.chatIdIsChannel &&
+                !oauthInfo?.allowedUserIds && (
+                  <HintBox icon={ShieldAlert} variant="warning">
+                    检测到当前环境变量 <span className="font-mono">TG_CHAT_ID</span>{" "}
+                    为负数频道/群组 ID，不可直接作为个人登录 ID。请在上方「允许登录的
+                    Telegram 用户 ID」中填入你个人的正整数 Telegram User ID（可通过{" "}
+                    <span className="font-mono">@userinfobot</span> 获取）。
+                  </HintBox>
+                )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveTelegramOAuth}
+                    disabled={isSavingOAuth}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    <span>
+                      {isSavingOAuth ? "保存中..." : "保存 OAuth 配置"}
+                    </span>
+                  </Button>
+
+                  {oauthInfo?.hasKvOverride && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetTelegramOAuth}
+                      disabled={isSavingOAuth}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>恢复环境变量默认</span>
+                    </Button>
+                  )}
+                </div>
+
+                {oauthInfo?.configured && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                  >
+                    <a
+                      href="/auth/telegram/start"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>测试 OAuth 跳转</span>
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </SettingCard>
+
+        {/* 2. 浏览设置 */}
+        <SettingCard icon={Eye} iconColor="text-sky-500" title="浏览设置">
           <div className="flex flex-col space-y-4">
-            {/* 安全模式 */}
-            <SettingItem title="安全模式" desc="NSFW 敏感内容显示遮罩">
+            <SettingItem title="安全模式" desc="NSFW 敏感内容显示模糊遮罩">
               <SafeModeToggle />
             </SettingItem>
 
-            {/* 图片加载模式 */}
-            <SettingItem title="图片加载模式">
+            <SettingItem title="图片加载模式" desc="控制原图、省流或无图预览策略">
               <ImageLoadModeToggle />
             </SettingItem>
 
-            {/* 省流阈值 - 仅在省流模式显示 */}
             {store.imageLoadMode === ImageLoadMode.DataSaver && (
               <>
                 <SettingItem title="省流模式阈值">
@@ -345,22 +691,24 @@ export function GeneralTab({
                       min="0.1"
                       value={localThreshold}
                       onChange={(e) => setLocalThreshold(e.target.value)}
-                      className="w-24 h-9 text-right font-mono text-xs rounded-lg bg-background/50"
+                      className="w-24 h-9 text-right font-mono text-xs bg-background border-border"
                     />
-                    MB
+                    <span className="text-xs font-mono text-muted-foreground">
+                      MB
+                    </span>
                   </div>
                 </SettingItem>
-                <HintBox>省流模式下，超过此大小的图片不加载预览。</HintBox>
+                <HintBox>省流模式下，超过此大小的图片不自动加载原图预览。</HintBox>
               </>
             )}
           </div>
         </SettingCard>
 
-        {/* 2. 上传设置 */}
+        {/* 3. 上传与频道Webhook设置 */}
         <SettingCard
           icon={ShieldCheck}
           iconColor="text-emerald-500"
-          title="上传设置"
+          title="上传与频道同步设置"
         >
           <div className="flex flex-col space-y-4">
             <SettingItem title="NSFW 内容检测" desc="上传前本地检测敏感内容">
@@ -383,7 +731,7 @@ export function GeneralTab({
             </SettingItem>
             {!store.enableImageAnalysis && (
               <HintBox icon={Sparkles} variant="info">
-                关闭后跳过 AI 分析，可节省一次 KV 写操作
+                关闭后跳过 AI 分析，可节省一次 KV 写操作。
               </HintBox>
             )}
 
@@ -395,13 +743,15 @@ export function GeneralTab({
               />
             </SettingItem>
 
-            <div className="rounded-lg border border-border/20 bg-background/50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
+            <div className="rounded-[var(--r-sm)] border border-border bg-secondary/50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 text-left">
                   <Webhook className="h-5 w-5 text-sky-500 shrink-0" />
                   <div className="min-w-0">
-                    <p className="font-medium text-sm">Telegram 频道上传</p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="font-medium text-sm text-foreground">
+                      Telegram 频道上传 Webhook
+                    </p>
+                    <p className="text-xs font-mono text-muted-foreground truncate">
                       {telegramWebhookInfo?.url ||
                         (telegramWebhookInfo?.reason === "missing-token"
                           ? "缺少 TG_BOT_TOKEN"
@@ -417,15 +767,14 @@ export function GeneralTab({
                     disabled={
                       isCheckingTelegramWebhook || isSettingTelegramWebhook
                     }
-                    className="h-9"
                   >
                     <RefreshCw
                       className={cn(
-                        "h-4 w-4 mr-2",
+                        "h-4 w-4",
                         isCheckingTelegramWebhook && "animate-spin"
                       )}
                     />
-                    检查状态
+                    <span>检查状态</span>
                   </Button>
                   <Button
                     size="sm"
@@ -433,20 +782,19 @@ export function GeneralTab({
                     disabled={
                       isCheckingTelegramWebhook || isSettingTelegramWebhook
                     }
-                    className="h-9"
                   >
                     <CloudUpload
                       className={cn(
-                        "h-4 w-4 mr-2",
+                        "h-4 w-4",
                         isSettingTelegramWebhook && "animate-pulse"
                       )}
                     />
-                    配置 Webhook
+                    <span>配置 Webhook</span>
                   </Button>
                 </div>
               </div>
               {telegramWebhookInfo?.lastErrorMessage && (
-                <p className="mt-3 text-xs text-destructive">
+                <p className="mt-3 text-xs text-destructive text-left">
                   {telegramWebhookInfo.lastErrorMessage}
                 </p>
               )}
@@ -458,15 +806,17 @@ export function GeneralTab({
         {supportsFsApi ? (
           <SettingCard
             icon={Download}
-            iconColor="text-orange-500"
+            iconColor="text-amber-500"
             title="下载管理"
           >
-            <div className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border/20">
+            <div className="flex items-center justify-between p-4 rounded-[var(--r-sm)] bg-secondary/50 border border-border text-left">
               <div className="flex items-center gap-3">
-                <FolderOpen className="h-5 w-5 text-blue-500" />
+                <FolderOpen className="h-5 w-5 text-sky-500" />
                 <div>
-                  <p className="font-medium text-sm">大文件/批量下载目录</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-medium text-sm text-foreground">
+                    大文件/批量下载目录
+                  </p>
+                  <p className="text-xs font-mono text-muted-foreground">
                     {currentDir || "未设置"}
                   </p>
                 </div>
@@ -477,22 +827,18 @@ export function GeneralTab({
                   size="sm"
                   onClick={handleChangeDirectory}
                   disabled={isDirLoading}
-                  className="h-9"
                 >
                   <RefreshCw
-                    className={cn(
-                      "h-4 w-4 mr-2",
-                      isDirLoading && "animate-spin"
-                    )}
+                    className={cn("h-4 w-4", isDirLoading && "animate-spin")}
                   />
-                  更换目录
+                  <span>更换目录</span>
                 </Button>
                 {currentDir && (
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
                     onClick={handleClearDirectory}
-                    className="h-9"
+                    disabled={isDirLoading}
                     title="清除目录"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -506,12 +852,12 @@ export function GeneralTab({
             </HintBox>
           </SettingCard>
         ) : (
-          <Alert className="border-yellow-500/50 bg-yellow-500/10">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertTitle className="text-yellow-800">
+          <Alert className="border-amber-500/40 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-amber-800 dark:text-amber-300">
               自定义下载目录不可用
             </AlertTitle>
-            <AlertDescription className="text-yellow-700">
+            <AlertDescription className="text-amber-700 dark:text-amber-300/90">
               当前浏览器将使用默认下载方式。移动端批量下载需逐个打开/保存文件。
             </AlertDescription>
           </Alert>

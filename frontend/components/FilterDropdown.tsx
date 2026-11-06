@@ -153,7 +153,7 @@ export function FilterDropdown() {
           </Button>
         </div>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0 overflow-hidden bg-popover border-glass-border shadow-xl text-foreground">
+      <PopoverContent align="end" className="w-80 p-0 overflow-hidden bg-popover border-border text-foreground">
         <div className="p-4 space-y-5">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-medium text-foreground/70 uppercase tracking-wider">

@@ -3,9 +3,8 @@
 import { useFileUIStore } from "@/stores/file";
 import { FileItem, FileType } from "@shared/types";
 import { getFileUrl } from "@/lib/api";
-import { shouldBlur, shouldLoadImage } from "@/lib/utils";
+import { shouldBlur, shouldLoadImage, cn } from "@/lib/utils";
 import { PhotoView } from "react-photo-view";
-import { cn } from "@/lib/utils";
 import { NsfwSign } from "../file-card/NsfwSign";
 import { useGeneralSettingsStore } from "@/stores/general-store";
 import { Image } from "lucide-react";
@@ -28,10 +27,8 @@ export function MasonryImageCard({ file }: MasonryImageCardProps) {
   });
 
   const load = shouldLoad || forceLoadFiles.includes(file.name);
-
   const imageUrl = getFileUrl(file.name);
 
-  // 图片内容 - 让图片自然渲染，保持原始宽高比
   const imgContent = load ? (
     <img
       src={imageUrl}
@@ -39,39 +36,40 @@ export function MasonryImageCard({ file }: MasonryImageCardProps) {
       loading="lazy"
       decoding="async"
       className={cn(
-        "w-full h-auto transition-all duration-300",
+        "w-full h-auto block",
         blur && "blur-xl",
-        !blur && "cursor-zoom-in"
+        !blur && "cursor-zoom-in",
       )}
     />
   ) : (
     <div
-      className="flex flex-col items-center justify-center w-full py-12 bg-secondary/10 text-muted-foreground gap-2 cursor-pointer hover:bg-secondary/20 transition-colors"
+      className="flex flex-col items-center justify-center w-full py-12 bg-secondary text-muted-foreground gap-2 cursor-pointer hover:bg-accent transition-colors"
       onClick={(e) => {
         e.stopPropagation();
         addForceLoadFile(file.name);
       }}
     >
-      <Image className="w-8 h-8 opacity-50" aria-label="点击加载图片" />
-      <span className="text-xs opacity-50">点击加载</span>
+      <Image className="w-7 h-7" aria-label="点击加载图片" />
+      <span className="text-xs">点击加载原图</span>
     </div>
   );
 
   return (
-    <div className="relative group rounded-xl overflow-hidden bg-glass-bg border border-glass-border">
-      {/* 实际图片（加载完成后显示） */}
-      {!blur && load ? (
-        <PhotoView src={imageUrl}>{imgContent}</PhotoView>
-      ) : (
-        imgContent
-      )}
+    <div className="taste-card relative group overflow-hidden">
+      <div className="taste-card-media overflow-hidden bg-secondary">
+        {!blur && load ? (
+          <PhotoView src={imageUrl}>{imgContent}</PhotoView>
+        ) : (
+          imgContent
+        )}
+      </div>
 
-      {/* NSFW 提示 */}
       {blur && <NsfwSign />}
 
-      {/* 底部文件名悬浮 */}
-      <div className="absolute bottom-0 left-0 right-0 p-2 bg-linear-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        <p className="text-xs text-white truncate">{file.metadata?.fileName}</p>
+      <div className="px-3 py-2 border-t border-border bg-card text-left">
+        <p className="text-xs font-medium text-foreground truncate">
+          {file.metadata?.fileName || file.name}
+        </p>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatFileSize, formatTime } from "@/lib/utils";
-import { Clock, File, Code, Copy, Check, Tag } from "lucide-react";
+import { Clock, File, HardDrive, Code, Copy, Check, Tag } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileTagBadge } from "@/components/FileTagBadge";
@@ -40,16 +40,16 @@ export function FileDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-popover border-glass-border text-foreground max-w-md">
+      <DialogContent className="bg-card border-border text-foreground max-w-md">
         <DialogHeader>
           <DialogTitle className="text-foreground">文件详情</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="flex items-start gap-3">
-            <File className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+            <File className="h-4 w-4 taste-accent-text mt-1 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-foreground/60 mb-1">文件名</p>
+              <p className="text-xs text-muted-foreground mb-0.5">文件名</p>
               <p className="text-sm font-medium text-foreground break-all">
                 {file.metadata?.fileName}
               </p>
@@ -57,20 +57,20 @@ export function FileDetailDialog({
           </div>
 
           <div className="flex items-start gap-3">
-            <File className="h-5 w-5 text-purple-400 mt-0.5 shrink-0" />
+            <HardDrive className="h-4 w-4 text-sky-500 mt-1 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-foreground/60 mb-1">文件大小</p>
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-xs text-muted-foreground mb-0.5">文件大小</p>
+              <p className="text-sm font-mono font-medium text-foreground tabular-nums">
                 {formatFileSize(file.metadata?.fileSize ?? 0)}
               </p>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <Clock className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
+            <Clock className="h-4 w-4 text-amber-500 mt-1 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-foreground/60 mb-1">上传时间</p>
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-xs text-muted-foreground mb-0.5">上传时间</p>
+              <p className="text-sm font-mono font-medium text-foreground tabular-nums">
                 {formatTime(file.metadata?.uploadedAt)}
               </p>
             </div>
@@ -78,9 +78,9 @@ export function FileDetailDialog({
 
           {file.metadata.tags && file.metadata.tags.length > 0 && (
             <div className="flex items-start gap-3">
-              <Tag className="h-5 w-5 text-emerald-400 mt-0.5 shrink-0" />
+              <Tag className="h-4 w-4 text-emerald-500 mt-1 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground/60 mb-1">标签</p>
+                <p className="text-xs text-muted-foreground mb-1">标签</p>
                 <div className="flex flex-wrap gap-2">
                   {file.metadata.tags.map((tag) => (
                     <FileTagBadge key={tag} tag={tag} />
@@ -91,28 +91,28 @@ export function FileDetailDialog({
           )}
         </div>
 
-        <div className="border-t border-glass-border pt-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2">
-              <Code className="h-5 w-5 text-teal-400" />
-              <p className="text-sm font-medium text-foreground">JSON 数据</p>
+              <Code className="h-4 w-4 text-teal-500" />
+              <p className="text-sm font-medium text-foreground">元数据 JSON</p>
             </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={handleCopyJson}
-              className="text-foreground/80 hover:text-foreground hover:bg-secondary/50 gap-2"
+              className="h-8 gap-1.5"
             >
               {copied ? (
-                <Check className="h-4 w-4 text-primary" />
+                <Check className="h-3.5 w-3.5 taste-accent-text" />
               ) : (
-                <Copy className="h-4 w-4" />
+                <Copy className="h-3.5 w-3.5" />
               )}
-              {copied ? "已复制" : "复制"}
+              <span>{copied ? "已复制" : "复制"}</span>
             </Button>
           </div>
-          <div className="bg-secondary/30 rounded-lg p-4 overflow-x-auto overflow-y-auto max-h-80 border border-glass-border">
-            <pre className="text-xs text-foreground/80 font-mono whitespace-pre-wrap break-all">
+          <div className="bg-secondary rounded-[var(--r-sm)] p-3.5 overflow-x-auto overflow-y-auto max-h-72 border border-border">
+            <pre className="text-xs text-foreground font-mono whitespace-pre-wrap break-all">
               {jsonString}
             </pre>
           </div>

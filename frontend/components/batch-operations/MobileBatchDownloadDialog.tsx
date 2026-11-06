@@ -43,14 +43,12 @@ interface MobileBatchDownloadDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// 1. 提取静态配置到组件外，避免重复渲染
 const FILE_ICONS: Record<string, React.ReactNode> = {
-  [FileType.Image]: <ImageIcon className="h-4 w-4 text-blue-400" />,
-  [FileType.Video]: <Video className="h-4 w-4 text-purple-400" />,
-  [FileType.Audio]: <Music className="h-4 w-4 text-emerald-400" />,
+  [FileType.Image]: <ImageIcon className="h-4 w-4 text-sky-500" />,
+  [FileType.Video]: <Video className="h-4 w-4 text-teal-500" />,
+  [FileType.Audio]: <Music className="h-4 w-4 text-emerald-500" />,
 };
 
-/** 判断移动端批量下载中是否应直接打开大媒体文件。 */
 function shouldOpenLargeMedia(entry: QueueEntry) {
   return (
     entry.metadata.fileSize > DIRECT_DOWNLOAD_LIMIT &&
@@ -58,7 +56,6 @@ function shouldOpenLargeMedia(entry: QueueEntry) {
   );
 }
 
-/** 移动端批量下载队列，要求用户逐个点击触发浏览器下载。 */
 export function MobileBatchDownloadDialog({
   files,
   open,
@@ -78,14 +75,12 @@ export function MobileBatchDownloadDialog({
   const completed = queue.filter((e) => e.status === "success").length;
   const progress = total ? Math.round((completed / total) * 100) : 0;
 
-  // 2. 封装统一的状态更新函数
   const updateStatus = (index: number, status: FileStatus) => {
     setQueue((prev) =>
-      prev.map((e, i) => (i === index ? { ...e, status } : e))
+      prev.map((e, i) => (i === index ? { ...e, status } : e)),
     );
   };
 
-  // 3. 合并下载与重试逻辑
   const handleAction = async (index: number, isRetry = false) => {
     const entry = queue[index];
     if (!entry || (entry.status === "failed" && !isRetry)) return;
@@ -103,7 +98,7 @@ export function MobileBatchDownloadDialog({
 
       const { status } = await downloadFile(
         getFileDownloadUrl(entry.key),
-        entry.metadata
+        entry.metadata,
       );
       updateStatus(index, status === "success" ? "success" : "failed");
     } catch {
@@ -116,15 +111,15 @@ export function MobileBatchDownloadDialog({
 
   const getStatusIcon = (status: FileStatus, type: FileType) => {
     if (status === "success")
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
     if (status === "failed")
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    return FILE_ICONS[type] || <FileText className="h-4 w-4 text-amber-400" />;
+      return <XCircle className="h-4 w-4 text-destructive" />;
+    return FILE_ICONS[type] || <FileText className="h-4 w-4 text-amber-500" />;
   };
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh] flex flex-col w-full">
+      <DrawerContent className="max-h-[85vh] flex flex-col w-full bg-card border-border">
         <DrawerHeader>
           <DrawerTitle>批量下载</DrawerTitle>
           <DrawerDescription>
@@ -133,50 +128,48 @@ export function MobileBatchDownloadDialog({
         </DrawerHeader>
 
         <div className="space-y-2 px-4">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm font-mono tabular-nums">
             <span className="text-muted-foreground">
               {completed} / {total}
             </span>
-            <span className="font-mono text-xs text-muted-foreground">
-              {progress}%
-            </span>
+            <span className="text-xs text-muted-foreground">{progress}%</span>
           </div>
           <Progress value={progress} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3">
-          <div className="space-y-1">
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="space-y-1.5">
             {queue.map((entry, index) => {
               const isActive = index === activeIndex;
               return (
                 <div
                   key={entry.key}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
-                    isActive ? "border-blue-300 bg-blue-50" : "bg-muted/30"
+                  className={`flex items-center gap-2 rounded-[var(--r-sm)] border px-3 py-2 transition-colors ${
+                    isActive
+                      ? "border-primary bg-secondary"
+                      : "border-border bg-background"
                   }`}
                 >
                   <div className="shrink-0">
                     {isActive ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     ) : (
                       getStatusIcon(entry.status, entry.fileType)
                     )}
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {entry.metadata.fileName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs font-mono text-muted-foreground tabular-nums">
                       {formatFileSize(entry.metadata.fileSize || 0)}
                     </p>
                   </div>
 
-                  {/* 4. 简化按钮渲染逻辑 */}
                   {entry.status !== "failed" && (
                     <Button
-                      size="sm"
-                      className="h-8 px-2"
+                      size="icon-sm"
                       onClick={() => handleAction(index)}
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -186,7 +179,7 @@ export function MobileBatchDownloadDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 px-2 shrink-0"
+                      className="h-8 px-2.5 shrink-0"
                       onClick={() => handleAction(index, true)}
                     >
                       重试

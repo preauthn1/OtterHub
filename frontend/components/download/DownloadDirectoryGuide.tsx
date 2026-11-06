@@ -18,15 +18,15 @@ import {
 const FEATURES = [
   {
     Icon: FolderOpen,
-    color: "text-blue-500",
+    color: "text-sky-500",
     title: "推荐目录",
     desc: "建议创建并选择 Downloads / OtterHub 目录",
   },
   {
     Icon: Save,
-    color: "text-purple-500",
+    color: "text-teal-500",
     title: "记住选择",
-    desc: "大文件和批量下载时自动使用选择的目录",
+    desc: "大文件和批量下载时自动使用已授权目录",
   },
 ];
 
@@ -43,19 +43,19 @@ export function DownloadDirectoryGuide({
 }: Props) {
   const handleSelect = () =>
     pickDownloadDirectoryForFirstTime().then(
-      (r) => r && onDirectorySelected(r)
+      (r) => r && onDirectorySelected(r),
     );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderPlus className="h-5 w-5 text-primary" />
+            <FolderPlus className="h-5 w-5 taste-accent-text" />
             选择下载目录
           </DialogTitle>
           <DialogDescription>
-            首次保存大文件或批量下载时，需要选择下载目录
+            首次保存大文件或批量下载时，需要授权本地保存目录
           </DialogDescription>
         </DialogHeader>
 
@@ -63,11 +63,11 @@ export function DownloadDirectoryGuide({
           {FEATURES.map(({ Icon, color, title, desc }) => (
             <div
               key={title}
-              className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3"
+              className="flex items-start gap-3 rounded-[var(--r-sm)] border border-border bg-secondary p-3"
             >
               <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${color}`} />
               <div>
-                <p className="font-medium text-sm">{title}</p>
+                <p className="font-medium text-sm text-foreground">{title}</p>
                 <p className="text-xs text-muted-foreground mt-1">{desc}</p>
               </div>
             </div>

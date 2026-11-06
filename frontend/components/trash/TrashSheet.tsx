@@ -43,7 +43,6 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
     }
   }, [open, fetchBucket, trashBucket.items.length, trashBucket.hasMore]);
 
-  // 当 Sheet 关闭时清除选中
   useEffect(() => {
     if (!open) {
       clearSelection(FileType.Trash);
@@ -59,12 +58,12 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
 
     setIsBatchProcessing(true);
     const toastId = toast.loading(
-      `正在还原 ${selectedTrashKeys.length} 个文件...`
+      `正在还原 ${selectedTrashKeys.length} 个文件...`,
     );
 
     try {
       const selectedItems = trashBucket.items.filter((item) =>
-        selectedTrashKeys.includes(item.name)
+        selectedTrashKeys.includes(item.name),
       );
 
       await processBatch(
@@ -78,7 +77,7 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
             id: toastId,
           });
         },
-        10
+        10,
       );
 
       clearSelection(FileType.Trash);
@@ -96,19 +95,19 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
   const handleBatchDelete = async () => {
     if (
       !confirm(
-        `确定永久删除选中的 ${selectedTrashKeys.length} 个文件? 此操作不可恢复！`
+        `确定永久删除选中的 ${selectedTrashKeys.length} 个文件? 此操作不可恢复！`,
       )
     )
       return;
 
     setIsBatchProcessing(true);
     const toastId = toast.loading(
-      `正在删除 ${selectedTrashKeys.length} 个文件...`
+      `正在删除 ${selectedTrashKeys.length} 个文件...`,
     );
 
     try {
       const selectedItems = trashBucket.items.filter((item) =>
-        selectedTrashKeys.includes(item.name)
+        selectedTrashKeys.includes(item.name),
       );
 
       await processBatch(
@@ -122,7 +121,7 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
             id: toastId,
           });
         },
-        10
+        10,
       );
 
       clearSelection(FileType.Trash);
@@ -144,8 +143,6 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
     const toastId = toast.loading("正在清空回收站...");
 
     try {
-      // 注意：这里只删除当前已加载的 items。如果后端没有清空接口，只能这样处理。
-      // 如果 items 非常多，建议后端增加 Empty Trash 接口。
       const itemsToDelete = [...trashBucket.items];
 
       await processBatch(
@@ -159,7 +156,7 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
             id: toastId,
           });
         },
-        10
+        10,
       );
 
       toast.success("回收站已清空", { id: toastId });
@@ -172,38 +169,42 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:w-[540px] flex flex-col p-0 bg-background/95 backdrop-blur-xl border-l border-border">
-        <SheetHeader className="px-6 py-4 border-b border-border">
-          <SheetTitle className="flex items-center gap-2">回收站</SheetTitle>
-          <SheetDescription className="text-sm text-foreground/80">
-            文件将于 30 天后永久删除。{" "}
+      <SheetContent className="w-full sm:w-[520px] flex flex-col p-0 bg-card border-l border-border">
+        <SheetHeader className="px-6 py-4 border-b border-border text-left">
+          <div className="flex items-center justify-between pr-8">
+            <SheetTitle className="text-base font-semibold text-foreground">
+              回收站
+            </SheetTitle>
             {!isEmpty && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleEmptyTrash}
                 disabled={isBatchProcessing}
-                className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                className="text-destructive hover:text-destructive"
               >
                 {isBatchProcessing ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="h-4 w-4 mr-1" />
+                  <Trash2 className="h-4 w-4" />
                 )}
-                清空回收站
+                <span>清空回收站</span>
               </Button>
             )}
+          </div>
+          <SheetDescription className="text-xs text-muted-foreground">
+            移入回收站的文件将于 30 天后自动彻底清除。
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 px-3">
+        <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3">
           {isEmpty && !trashBucket.loading ? (
-            <div className="h-full flex flex-col items-center justify-center text-foreground/80 gap-2 min-h-[300px]">
-              <Trash2 className="h-12 w-12 opacity-20" />
-              <p>Trash is empty</p>
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 min-h-[300px]">
+              <Trash2 className="h-10 w-10 opacity-30" />
+              <p className="text-sm">回收站为空</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {trashBucket.items.map((file) => (
                 <TrashFileCard key={file.name} file={file} />
               ))}
@@ -217,12 +218,11 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
               {!trashBucket.loading && trashBucket.hasMore && (
                 <div className="flex justify-center pt-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={handleLoadMore}
-                    className="text-foreground/60 hover:text-foreground"
                   >
-                    Load More
+                    加载更多
                   </Button>
                 </div>
               )}
@@ -230,11 +230,10 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
           )}
         </div>
 
-        {/* Batch Operations Footer */}
         {hasSelection && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-xl flex items-center justify-between animate-in slide-in-from-bottom-5">
-            <div className="text-sm font-medium">
-              {selectedTrashKeys.length} selected
+          <div className="p-4 border-t border-border bg-secondary flex items-center justify-between">
+            <div className="text-sm font-mono tabular-nums text-foreground">
+              已选择 {selectedTrashKeys.length} 个文件
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -242,28 +241,26 @@ export function TrashSheet({ open, onOpenChange }: TrashSheetProps) {
                 size="sm"
                 onClick={handleBatchRestore}
                 disabled={isBatchProcessing}
-                className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
               >
                 {isBatchProcessing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <RefreshCcw className="h-4 w-4" />
                 )}
-                Restore
+                <span>还原</span>
               </Button>
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleBatchDelete}
                 disabled={isBatchProcessing}
-                className="gap-1"
               >
                 {isBatchProcessing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
-                Delete
+                <span>彻底删除</span>
               </Button>
             </div>
           </div>

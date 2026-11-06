@@ -77,7 +77,7 @@ export function SortTypeDropdown() {
             <ChevronDown className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40 bg-popover border-glass-border shadow-xl">
+        <DropdownMenuContent align="end" className="w-40 bg-popover border-border">
           <DropdownMenuLabel className="text-xs text-foreground/50">排序字段</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={sortType} onValueChange={(v) => setSortType(v as SortType)}>
             {typeOptions.map((option) => {

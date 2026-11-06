@@ -126,7 +126,7 @@ export function FloatingActionButton() {
       icon: <Settings className="h-5 w-5" />,
       label: "系统设置",
       onClick: () => setIsSettingsOpen(true),
-      className: "bg-sky-400/90 text-white hover:bg-sky-500 shadow-sky-400/20",
+      className: "bg-card text-foreground border border-border hover:bg-secondary shadow-md",
     },
     {
       id: "trash",
@@ -134,7 +134,7 @@ export function FloatingActionButton() {
       label: "回收站",
       onClick: () => setIsTrashOpen(true),
       className:
-        "bg-indigo-400/90 text-white hover:bg-indigo-500 shadow-indigo-400/20",
+        "bg-card text-foreground border border-border hover:bg-secondary shadow-md",
     },
   ];
 
@@ -176,7 +176,7 @@ export function FloatingActionButton() {
                   "absolute transition-all duration-500 ease-out-back",
                   isOpen
                     ? "opacity-100 scale-100 pointer-events-auto"
-                    : "opacity-0 scale-0 pointer-events-none"
+                    : "opacity-0 scale-90 pointer-events-none"
                 )}
                 style={{
                   transform: isOpen
