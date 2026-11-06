@@ -1,17 +1,15 @@
-import { Github } from "lucide-react"
-
 export function Footer() {
   return (
-    <footer className="flex items-center justify-center gap-2 py-4 text-foreground/60 hover:text-foreground/80 transition-colors">
-      <a 
-        href="https://github.com/DJChanahCJD/OtterHub" 
-        target="_blank" 
+    <footer className="flex items-center justify-between gap-4 pt-2 text-xs text-muted-foreground">
+      <span>OtterHub Cloud Drive</span>
+      <a
+        href="https://github.com/preauthn1/OtterHub"
+        target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2"
+        className="taste-link"
       >
-        <Github className="h-5 w-5" />
-        <span className="text-sm">OtterHub</span>
+        GitHub Repository
       </a>
     </footer>
-  )
+  );
 }

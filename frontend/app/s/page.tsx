@@ -5,13 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { shareApi } from "@/lib/api/share";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Download,
   FileIcon,
   Loader2,
@@ -30,6 +23,10 @@ import {
 } from "lucide-react";
 import { formatFileSize, formatTime, getFileCategoryByName } from "@/lib/utils";
 import { ShareMetaResponse } from "@shared/types";
+import { BrandLogo } from "@/components/BrandLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { APP_NAME } from "@/lib/ui-text";
+import { Footer } from "@/components/footer";
 
 const getFileCategory = (name: string) => getFileCategoryByName(name);
 
@@ -57,20 +54,39 @@ const triggerDownload = (url: string, filename: string) => {
   link.click();
 };
 
+function ShareHeader() {
+  return (
+    <header className="nav">
+      <div className="wrap flex items-center justify-between gap-4">
+        <a
+          href="/"
+          className="inline-flex items-center gap-2.5 text-foreground no-underline"
+        >
+          <BrandLogo size="sm" />
+          <span className="text-base font-semibold tracking-tight">
+            {APP_NAME}
+          </span>
+        </a>
+        <ThemeToggle />
+      </div>
+    </header>
+  );
+}
+
 function ShareContent() {
   const token = useSearchParams().get("k");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<ShareMetaResponse | null>(null);
-  const [isActioning, setIsActioning] = useState(false); // 合并下载状态
+  const [isActioning, setIsActioning] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!token) return (setError("Invalid link"), setLoading(false));
+    if (!token) return (setError("无效的分享链接"), setLoading(false));
     shareApi
       .getMeta(token)
       .then(setMeta)
-      .catch((err) => setError(err.message || "Failed to load file info"))
+      .catch((err) => setError(err.message || "无法加载分享文件信息"))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -79,13 +95,13 @@ function ShareContent() {
       (meta?.files || [])
         .map((f, i) => ({ ...f, originalIndex: i }))
         .filter((f) =>
-          ["image", "video", "audio"].includes(getFileCategory(f.name))
+          ["image", "video", "audio"].includes(getFileCategory(f.name)),
         ),
-    [meta?.files]
+    [meta?.files],
   );
 
   const currentPreviewIndexInList = previewableFiles.findIndex(
-    (f) => f.originalIndex === previewIndex
+    (f) => f.originalIndex === previewIndex,
   );
   const currentPreviewFile = previewableFiles[currentPreviewIndexInList];
 
@@ -96,7 +112,7 @@ function ShareContent() {
       const nextIdx = (currentPreviewIndexInList + step + len) % len;
       setPreviewIndex(previewableFiles[nextIdx].originalIndex);
     },
-    [previewableFiles, currentPreviewIndexInList]
+    [previewableFiles, currentPreviewIndexInList],
   );
 
   useEffect(() => {
@@ -123,7 +139,7 @@ function ShareContent() {
   };
 
   if (loading) return <FullScreenLoader />;
-  if (error) return <ErrorCard error={error} />;
+  if (error) return <ErrorView error={error} />;
 
   const isBundle = meta?.type === "bundle";
 
@@ -140,197 +156,245 @@ function ShareContent() {
         />
       )}
 
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 z-0" />
+      <ShareHeader />
 
-        <Card
-          className={`z-10 border-white/20 shadow-xl backdrop-blur-md bg-card/80 w-full ${isBundle ? "max-w-2xl" : "max-w-md"}`}
-        >
-          <CardHeader className="text-center space-y-4">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
-              {isBundle ? (
-                <Package className="h-10 w-10 text-primary" />
-              ) : (
-                <FileIcon className="h-10 w-10 text-primary" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-xl break-all">
-                {isBundle
-                  ? meta?.bundleName || `share-${token?.slice(0, 8)}`
-                  : meta?.fileName}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {isBundle
-                  ? `${meta?.files?.length || 0} 个文件 · ${formatFileSize(meta?.totalSize || 0)}`
-                  : formatFileSize(meta?.fileSize || 0)}
-              </p>
-            </div>
-          </CardHeader>
+      <main>
+        <section className="taste-workspace">
+          <div className="wrap flex flex-1 flex-col justify-between gap-8">
+            <div className="space-y-6">
+              <div className="text-left border-b border-border pb-4">
+                <p className="text-xs font-mono text-muted-foreground tabular-nums mb-1.5">
+                  OtterHub Controlled Share · 受控文件分发
+                </p>
+                <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-foreground break-all">
+                  {isBundle
+                    ? meta?.bundleName || `share-${token?.slice(0, 8)}`
+                    : meta?.fileName || "分享文件"}
+                </h1>
+              </div>
 
-          <CardContent className="space-y-4">
-            {isBundle ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto p-1">
-                {meta?.files?.map((file, i) => {
-                  const cat = getFileCategory(file.name);
-                  const isPrev = ["image", "video", "audio"].includes(cat);
-                  const url = shareApi.getDownloadUrl(token!, file.key);
-
-                  return (
-                    <div
-                      key={file.key || i}
-                      className="group relative rounded-lg bg-secondary/30 border border-glass-border overflow-hidden hover:border-primary/50 transition-all"
-                      onClick={() => isPrev && setPreviewIndex(i)}
-                    >
-                      <div className="aspect-square flex items-center justify-center bg-secondary/50">
-                        {cat === "image" && url ? (
-                          <img
-                            src={url}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+              <div
+                data-visual="share-package"
+                className="taste-panel"
+              >
+                <div
+                  data-ui="share-card"
+                  className="app-frame p-5 sm:p-6 space-y-5"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-sm)] border border-border bg-secondary text-foreground">
+                        {isBundle ? (
+                          <Package className="h-5 w-5 taste-accent-text" />
                         ) : (
-                          <FileIconByType
-                            category={cat}
-                            className="h-12 w-12 text-primary/50"
-                          />
+                          <FileIcon className="h-5 w-5 taste-accent-text" />
                         )}
                       </div>
-                      <div className="p-2 truncate">
-                        <p
-                          className="text-xs font-medium truncate"
-                          title={file.name}
-                        >
-                          {file.name}
+                      <div className="min-w-0 text-left">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {isBundle
+                            ? `${meta?.files?.length || 0} 个文件合集`
+                            : meta?.fileName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(file.size)}
+                        <p className="text-xs font-mono text-muted-foreground tabular-nums mt-0.5">
+                          {isBundle
+                            ? `总大小 ${formatFileSize(meta?.totalSize || 0)}`
+                            : formatFileSize(meta?.fileSize || 0)}
+                          {meta?.expiresAt
+                            ? ` · 有效期至 ${formatTime(meta.expiresAt)}`
+                            : ""}
                         </p>
-                      </div>
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        {isPrev && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewIndex(i);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            executeDownload(
-                              () => shareApi.getDownloadUrl(token!, file.key),
-                              file.name
-                            );
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              meta?.mimeType?.startsWith("image/") &&
-              token && (
-                <div className="relative aspect-video w-full overflow-hidden">
-                  <img
-                    src={shareApi.getDownloadUrl(token)}
-                    alt={meta.fileName}
-                    className="h-full w-full object-contain"
-                  />
+
+                    <Button
+                      size="default"
+                      className="shrink-0"
+                      disabled={isActioning}
+                      onClick={() =>
+                        isBundle
+                          ? executeDownload(
+                              () => shareApi.getDownloadAllUrl(token!),
+                              `${meta?.bundleName || `share-${token!.slice(0, 8)}`}.zip`,
+                            )
+                          : executeDownload(
+                              () => shareApi.getDownloadUrl(token!),
+                              meta?.fileName || "download",
+                            )
+                      }
+                    >
+                      {isActioning ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>下载中...</span>
+                        </>
+                      ) : isBundle ? (
+                        <>
+                          <Archive className="h-4 w-4" />
+                          <span>下载全部 (ZIP)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          <span>下载文件</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {isBundle ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 max-h-[460px] overflow-y-auto">
+                      {meta?.files?.map((file, i) => {
+                        const cat = getFileCategory(file.name);
+                        const isPrev = ["image", "video", "audio"].includes(cat);
+                        const url = shareApi.getDownloadUrl(token!, file.key);
+
+                        return (
+                          <div
+                            key={file.key || i}
+                            className="taste-card group relative overflow-hidden cursor-pointer flex flex-col"
+                            onClick={() => isPrev && setPreviewIndex(i)}
+                          >
+                            <div className="taste-card-media aspect-[4/3] flex items-center justify-center bg-secondary overflow-hidden">
+                              {cat === "image" && url ? (
+                                <img
+                                  src={url}
+                                  alt={file.name}
+                                  width={400}
+                                  height={300}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <FileIconByType
+                                  category={cat}
+                                  className="h-10 w-10 text-muted-foreground"
+                                />
+                              )}
+                            </div>
+                            <div className="p-2.5 border-t border-border bg-card text-left">
+                              <p
+                                className="text-xs font-medium text-foreground truncate"
+                                title={file.name}
+                              >
+                                {file.name}
+                              </p>
+                              <p className="text-[11px] font-mono text-muted-foreground tabular-nums mt-0.5">
+                                {formatFileSize(file.size)}
+                              </p>
+                            </div>
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              {isPrev && (
+                                <Button
+                                  size="icon-sm"
+                                  variant="secondary"
+                                  className="h-7 w-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewIndex(i);
+                                  }}
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  executeDownload(
+                                    () =>
+                                      shareApi.getDownloadUrl(token!, file.key),
+                                    file.name,
+                                  );
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    meta?.mimeType?.startsWith("image/") &&
+                    token && (
+                      <div className="relative aspect-video w-full overflow-hidden rounded-[var(--r-sm)] border border-border bg-secondary">
+                        <img
+                          src={shareApi.getDownloadUrl(token)}
+                          alt={meta.fileName}
+                          width={1280}
+                          height={720}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    )
+                  )}
+
+                  {meta?.expiresAt && (
+                    <div className="inline-flex items-center gap-2 rounded-[var(--r-sm)] border border-border bg-secondary px-3 py-1.5 text-xs font-mono text-muted-foreground tabular-nums">
+                      <CalendarClock className="h-3.5 w-3.5 taste-accent-text" />
+                      <span>分享链接将于 {formatTime(meta.expiresAt)} 自动失效</span>
+                    </div>
+                  )}
                 </div>
-              )
-            )}
+              </div>
+            </div>
 
-            <StatusBadges meta={meta} />
-          </CardContent>
-
-          <CardFooter>
-            <Button
-              className="w-full h-12 text-lg font-medium shadow-lg hover:shadow-primary/25 transition-all"
-              disabled={isActioning}
-              onClick={() =>
-                isBundle
-                  ? executeDownload(
-                      () => shareApi.getDownloadAllUrl(token!),
-                      `${meta?.bundleName || `share-${token!.slice(0, 8)}`}.zip`
-                    )
-                  : executeDownload(
-                      () => shareApi.getDownloadUrl(token!),
-                      meta?.fileName || "download"
-                    )
-              }
-            >
-              {isActioning ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  下载中...
-                </>
-              ) : isBundle ? (
-                <>
-                  <Archive className="mr-2 h-5 w-5" />
-                  下载全部 (ZIP)
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-5 w-5" />
-                  下载文件
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <div className="mt-8 text-center text-sm text-muted-foreground/50 z-10">
-          Powered by OtterHub
-        </div>
-      </div>
+            <Footer />
+          </div>
+        </section>
+      </main>
     </>
   );
 }
 
-// 抽取的小组件提升可读性
 const FullScreenLoader = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
-
-const ErrorCard = ({ error }: { error: string }) => (
-  <div className="flex min-h-screen items-center justify-center bg-background p-4">
-    <Card className="w-full max-w-md border-destructive/50 bg-destructive/5 text-center">
-      <CardHeader>
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-          <AlertCircle className="h-6 w-6 text-destructive" />
+  <>
+    <ShareHeader />
+    <main>
+      <section className="taste-workspace">
+        <div className="wrap flex flex-1 items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
         </div>
-        <CardTitle className="text-destructive">Link Unavailable</CardTitle>
-      </CardHeader>
-      <CardContent className="text-muted-foreground">{error}</CardContent>
-    </Card>
-  </div>
+      </section>
+    </main>
+  </>
 );
 
-const StatusBadges = ({ meta }: { meta: ShareMetaResponse | null }) => (
-  <div className="flex flex-col gap-2">
-    {meta?.expiresAt && (
-      <div className="flex items-center justify-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-600">
-        <CalendarClock className="h-4 w-4" />
-        将于 {formatTime(meta.expiresAt)} 过期
-      </div>
-    )}
-  </div>
+const ErrorView = ({ error }: { error: string }) => (
+  <>
+    <ShareHeader />
+    <main>
+      <section className="taste-workspace">
+        <div className="wrap flex flex-1 flex-col justify-between gap-8">
+          <div className="space-y-4 text-left max-w-xl">
+            <p className="text-xs font-mono text-muted-foreground">
+              Share Status · 404 / Expired
+            </p>
+            <h1 className="taste-h2">分享链接不可用或已过期</h1>
+            <p className="taste-lead">{error}</p>
+            <div className="pt-2" data-visual="share-error">
+              <div
+                data-ui="share-error-box"
+                className="flex items-center gap-3 rounded-[var(--r-md)] border border-border bg-card p-4 text-sm text-muted-foreground"
+              >
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+                <span>请向分享者确认链接是否完整，或重新生成有效外链。</span>
+              </div>
+            </div>
+            <div className="pt-2">
+              <Button asChild variant="outline">
+                <a href="/login">访问云盘工作台</a>
+              </Button>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      </section>
+    </main>
+  </>
 );
 
 const PreviewModal = ({
@@ -344,7 +408,6 @@ const PreviewModal = ({
   const cat = getFileCategory(file.name);
   const url = shareApi.getDownloadUrl(token, file.key);
 
-  // 核心逻辑：只有真正点击到背景那一层时才触发关闭
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -353,16 +416,17 @@ const PreviewModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-16"
-      onClick={handleBackdropClick} // 绑定到最外层
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 sm:p-16"
+      onClick={handleBackdropClick}
     >
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+        className="absolute top-4 right-4 p-2 rounded-[var(--r-sm)] bg-white/10 hover:bg-white/20 transition-colors z-10"
+        aria-label="关闭预览"
       >
-        <X className="h-6 w-6 text-white" />
+        <X className="h-5 w-5 text-white" />
       </button>
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-black/50 text-white text-sm max-w-[80%] truncate">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-[var(--r-sm)] bg-black/70 border border-white/15 text-white text-xs font-mono max-w-[75%] truncate">
         {file.name}
       </div>
 
@@ -373,27 +437,28 @@ const PreviewModal = ({
               e.stopPropagation();
               onNav(-1);
             }}
-            className="absolute left-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+            className="absolute left-4 p-2 rounded-[var(--r-sm)] bg-white/10 hover:bg-white/20 transition-colors z-10"
+            aria-label="上一个"
           >
-            <ChevronLeft className="h-8 w-8 text-white" />
+            <ChevronLeft className="h-6 w-6 text-white" />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onNav(1);
             }}
-            className="absolute right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+            className="absolute right-4 p-2 rounded-[var(--r-sm)] bg-white/10 hover:bg-white/20 transition-colors z-10"
+            aria-label="下一个"
           >
-            <ChevronRight className="h-8 w-8 text-white" />
+            <ChevronRight className="h-6 w-6 text-white" />
           </button>
         </>
       )}
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-sm">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-[var(--r-sm)] bg-black/70 border border-white/15 text-white text-xs font-mono tabular-nums">
         {currentIndex + 1} / {total}
       </div>
 
-      {/* 移除了原本的 w-full h-full 拦截层，直接依靠外层的 flex 居中 */}
       {cat === "image" && (
         <img
           src={url}
@@ -410,10 +475,10 @@ const PreviewModal = ({
         />
       )}
       {cat === "audio" && (
-        <div className="flex flex-col items-center gap-6 relative z-10">
-          <Music className="h-24 w-24 text-white/50" />
-          <p className="text-white text-lg">{file.name}</p>
-          <audio src={url} controls autoPlay className="w-80" />
+        <div className="flex flex-col items-center gap-5 relative z-10 bg-card border border-border p-6 rounded-[var(--r-md)]">
+          <Music className="h-14 w-14 taste-accent-text" />
+          <p className="text-foreground text-sm font-medium">{file.name}</p>
+          <audio src={url} controls autoPlay className="w-72 sm:w-80" />
         </div>
       )}
     </div>
