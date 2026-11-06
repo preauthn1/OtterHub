@@ -15,9 +15,32 @@ export const getFileTypeFromKey = (key: string): FileType => {
 };
 
 export const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const n = Number(bytes || 0);
+  if (!Number.isFinite(n) || n <= 0) return "0 B";
+  if (n < 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
+export const formatTransferSpeed = (bytesPerSec: number): string => {
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "计算中...";
+  return `${formatFileSize(bytesPerSec)}/s`;
+};
+
+export const formatEta = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "即将完成";
+  if (seconds > 86400) return "> 1 天";
+  const s = Math.ceil(seconds);
+  if (s < 60) return `${s} 秒`;
+  const mins = Math.floor(s / 60);
+  const remSec = s % 60;
+  if (mins < 60) {
+    return `${mins}分${String(remSec).padStart(2, "0")}秒`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMin = mins % 60;
+  return `${hours}小时${remMin}分`;
 };
 
 export function resizeImageToCanvas(

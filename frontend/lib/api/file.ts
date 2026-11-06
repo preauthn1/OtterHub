@@ -2,10 +2,15 @@ import { client } from "./client";
 import { API_URL, unwrap } from "./config";
 import {
   ApiResponse,
+  ChunkUploadCompletePayload,
   ChunkUploadInitPayload,
+  FileMetadata,
   FileTag,
+  FileType,
   ListFilesResponse,
   SingleUploadPayload,
+  UploadedChunkResult,
+  UrlUploadPayload,
 } from "@shared/types";
 import { ListFilesRequest } from "@/lib/types";
 
@@ -20,6 +25,15 @@ export type ChunkProcessingProgress = {
   uploaded: number;
   total: number;
   complete: boolean;
+};
+
+export type ChunkCompleteResponse = {
+  key: string;
+  fileType: FileType;
+  uploaded: number;
+  total: number;
+  complete: boolean;
+  metadata: FileMetadata;
 };
 
 function redirectToLoginIfNeeded() {
@@ -45,15 +59,46 @@ async function parseApiResponse<T>(raw: string): Promise<T> {
   return body.data as T;
 }
 
+export class UploadAbortedError extends Error {
+  constructor(message = "上传已暂停或取消") {
+    super(message);
+    this.name = "UploadAbortedError";
+  }
+}
+
 function xhrPostForm<T>(
   url: string,
   form: FormData,
   onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new UploadAbortedError());
+      return;
+    }
+
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url, true);
     xhr.withCredentials = true;
+
+    const onAbortSignal = () => {
+      try {
+        xhr.abort();
+      } catch {
+        // ignore
+      }
+    };
+
+    if (signal) {
+      signal.addEventListener("abort", onAbortSignal, { once: true });
+    }
+
+    const cleanup = () => {
+      if (signal) {
+        signal.removeEventListener("abort", onAbortSignal);
+      }
+    };
 
     xhr.upload.onprogress = (e) => {
       if (!onProgress) return;
@@ -65,14 +110,20 @@ function xhrPostForm<T>(
     };
 
     xhr.onload = async () => {
+      cleanup();
       if (xhr.status === 401) {
         redirectToLoginIfNeeded();
-        reject(new Error("Unauthorized"));
+        reject(new Error("登录状态已失效，请重新登录"));
         return;
       }
 
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          reject(new Error(parsed?.message || `HTTP ${xhr.status}`));
+        } catch {
+          reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
+        }
         return;
       }
 
@@ -84,8 +135,14 @@ function xhrPostForm<T>(
       }
     };
 
-    xhr.onerror = () => reject(new Error("网络错误"));
-    xhr.onabort = () => reject(new Error("请求已取消"));
+    xhr.onerror = () => {
+      cleanup();
+      reject(new Error("网络连接异常"));
+    };
+    xhr.onabort = () => {
+      cleanup();
+      reject(new UploadAbortedError());
+    };
 
     xhr.send(form);
   });
@@ -109,6 +166,7 @@ export async function uploadFileWithProgress(
   file: File,
   options: SingleUploadPayload,
   onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const form = new FormData();
   form.append("file", file);
@@ -116,7 +174,26 @@ export async function uploadFileWithProgress(
   form.append("tags", JSON.stringify(options.tags ?? []));
 
   const url = `${API_URL}/upload`;
-  return xhrPostForm<string>(url, form, onProgress);
+  return xhrPostForm<string>(url, form, onProgress, signal);
+}
+
+/**
+ * 通过远程 URL 直链拉取上传
+ */
+export async function uploadFileByUrl(
+  payload: UrlUploadPayload,
+): Promise<{ key: string; fileSize: number }> {
+  const res = await fetch(`${API_URL}/upload/by-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) {
+    redirectToLoginIfNeeded();
+    throw new Error("登录状态已失效");
+  }
+  return unwrap<{ key: string; fileSize: number }>(res);
 }
 
 /**
@@ -125,22 +202,28 @@ export async function uploadFileWithProgress(
 export async function uploadChunkInit(
   payload: ChunkUploadInitPayload,
 ): Promise<string> {
-  return unwrap<string>(
-    client.upload.chunk.init.$post({
-      json: payload,
-    })
-  );
+  const res = await fetch(`${API_URL}/upload/chunk/init`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) {
+    redirectToLoginIfNeeded();
+    throw new Error("登录状态已失效");
+  }
+  return unwrap<string>(res);
 }
 
 /**
- * 上传分片
+ * 上传分片（旧版兼容）
  */
 export async function uploadChunk(
   key: string,
   chunkIndex: number,
   chunkFile: File | Blob,
 ): Promise<string> {
-  const res = await unwrap<string | number>( // API might return number or string for data? Check type.
+  const res = await unwrap<string | number>(
     client.upload.chunk.$post({
       form: {
         key,
@@ -157,6 +240,7 @@ export async function uploadChunkWithProgress(
   chunkIndex: number,
   chunkFile: File | Blob,
   onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const form = new FormData();
   form.append("key", key);
@@ -164,8 +248,77 @@ export async function uploadChunkWithProgress(
   form.append("chunkFile", chunkFile);
 
   const url = `${API_URL}/upload/chunk`;
-  const res = await xhrPostForm<string | number>(url, form, onProgress);
+  const res = await xhrPostForm<string | number>(url, form, onProgress, signal);
   return res.toString();
+}
+
+/**
+ * 零 KV 竞争的大文件分片直传（带指数退避自动重试与中止信号支持）
+ */
+export async function uploadChunkDirectWithProgress(
+  key: string,
+  chunkIndex: number,
+  chunkFile: File | Blob,
+  fileName?: string,
+  onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
+  maxRetries = 3,
+): Promise<UploadedChunkResult> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (signal?.aborted) {
+      throw new UploadAbortedError();
+    }
+
+    try {
+      const form = new FormData();
+      form.append("key", key);
+      form.append("chunkIndex", chunkIndex.toString());
+      form.append("direct", "true");
+      if (fileName) {
+        form.append("fileName", fileName);
+      }
+      form.append("chunkFile", chunkFile);
+
+      const url = `${API_URL}/upload/chunk`;
+      return await xhrPostForm<UploadedChunkResult>(
+        url,
+        form,
+        onProgress,
+        signal,
+      );
+    } catch (err) {
+      if (err instanceof UploadAbortedError || signal?.aborted) {
+        throw new UploadAbortedError();
+      }
+      lastError = err;
+      if (attempt === maxRetries) break;
+      const delayMs = Math.min(8000, Math.pow(2, attempt) * 900);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("分片上传失败");
+}
+
+/**
+ * 完成大文件分片上传或保存断点（单次原子写入 KV）
+ */
+export async function completeChunkUpload(
+  payload: ChunkUploadCompletePayload,
+): Promise<ChunkCompleteResponse> {
+  const res = await fetch(`${API_URL}/upload/chunk/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) {
+    redirectToLoginIfNeeded();
+    throw new Error("登录状态已失效");
+  }
+  return unwrap<ChunkCompleteResponse>(res);
 }
 
 export async function getUploadChunkProgress(

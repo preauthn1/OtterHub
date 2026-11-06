@@ -1,9 +1,5 @@
-import * as nsfwjs from "nsfwjs";
-import * as tf from "@tensorflow/tfjs";
 import { MAX_CHUNK_SIZE } from "@shared/types";
 import { resizeImageToCanvas } from "@/lib/utils/file";
-
-tf.enableProdMode();
 
 export enum NSFWClass {
   Drawing = "Drawing",
@@ -18,13 +14,11 @@ export interface NSFWResult {
   predictions: { className: NSFWClass; probability: number }[];
 }
 
-// https://nsfwjs.com/
 const MODEL_PATH = "MobileNetV2Mid";
 
 type ProbMap = Record<NSFWClass, number>;
 
-// 将 predictions 转换为概率映射（一次遍历，O(n)）
-function toProbMap(predictions: nsfwjs.PredictionType[]): ProbMap {
+function toProbMap(predictions: Array<{ className: string; probability: number }>): ProbMap {
   const map: ProbMap = {
     Drawing: 0,
     Hentai: 0,
@@ -40,35 +34,39 @@ function toProbMap(predictions: nsfwjs.PredictionType[]): ProbMap {
 }
 
 function judgeUnsafe(p: ProbMap): boolean {
-  const hard = p.Porn + p.Hentai; // 硬色情概率
-  const soft = p.Sexy * (1 - p.Neutral); // 软色情概率
-
+  const hard = p.Porn + p.Hentai;
+  const soft = p.Sexy * (1 - p.Neutral);
   return hard * 3 + soft >= 1;
 }
 
-// 模型 warm-up：提升首帧性能
-async function warmupModel(model: nsfwjs.NSFWJS) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 224;
-  try {
-    await model.classify(canvas);
-  } catch {
-    // warm-up 失败不影响主流程
-  }
-}
-
-
 class NSFWDetector {
-  private model?: nsfwjs.NSFWJS;
-  private loading?: Promise<nsfwjs.NSFWJS>;
+  private model?: any;
+  private loading?: Promise<any>;
 
   private async getModel() {
     if (this.model) return this.model;
     if (!this.loading) {
-      this.loading = nsfwjs.load(MODEL_PATH).then(async (m) => {
-        await warmupModel(m);
+      this.loading = (async () => {
+        const [tf, nsfwjs] = await Promise.all([
+          import("@tensorflow/tfjs"),
+          import("nsfwjs"),
+        ]);
+        try {
+          tf.enableProdMode();
+        } catch {
+          // ignore
+        }
+        const m = await nsfwjs.load(MODEL_PATH);
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 224;
+        try {
+          await m.classify(canvas);
+        } catch {
+          // ignore warm-up failure
+        }
+        this.model = m;
         return m;
-      });
+      })();
     }
     return this.loading;
   }
@@ -79,19 +77,8 @@ class NSFWDetector {
     try {
       const model = await this.getModel();
       const predictions = await model.classify(el);
-
       const prob = toProbMap(predictions);
-      const isUnsafe = judgeUnsafe(prob);
-
-      // 仅开发环境输出详细日志
-      if (process.env.NODE_ENV === "development") {
-        console.table({
-          ...prob,
-          isUnsafe,
-        });
-      }
-
-      return isUnsafe;
+      return judgeUnsafe(prob);
     } catch (err) {
       console.warn("NSFW detect failed:", err);
       return false;
@@ -99,7 +86,7 @@ class NSFWDetector {
   }
 
   async isUnsafeImg(file: File): Promise<boolean> {
-    if (file.type.indexOf("image") === -1 || file.size > MAX_CHUNK_SIZE) { // 只检测＜20MB的图片文件
+    if (!file.type.startsWith("image/") || file.size > MAX_CHUNK_SIZE) {
       return false;
     }
     const img = new Image();
@@ -111,7 +98,6 @@ class NSFWDetector {
         img.onerror = () => rej();
         img.src = url;
       });
-      // 使用缩放后的图片进行检测
       const canvas = resizeImageToCanvas(img);
       return await this.detect(canvas);
     } catch {

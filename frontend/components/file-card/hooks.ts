@@ -8,14 +8,15 @@ import {
   getFileTypeFromKey,
   downloadFile,
   getMissingChunkIndices,
-  processBatch,
+  runConcurrentPool,
 } from "@/lib/utils";
 import {
+  completeChunkUpload,
   getFileDownloadUrl,
   getFileUrl,
   moveToTrash,
   toggleLike,
-  uploadChunk,
+  uploadChunkDirectWithProgress,
 } from "@/lib/api";
 import {
   MAX_CONCURRENTS,
@@ -24,12 +25,11 @@ import {
 } from "@/lib/types";
 import { toast } from "sonner";
 import { shouldBlur } from "@/lib/utils";
-import { FileItem, FileType, MAX_CHUNK_SIZE } from "@shared/types";
+import { Chunk, FileItem, FileType, MAX_CHUNK_SIZE } from "@shared/types";
 import { useGeneralSettingsStore } from "@/stores/general-store";
 import { usePreviewStore } from "@/stores/preview-store";
 import { isMobileBrowser } from "@/hooks/use-mobile";
 
-/** 判断移动端大媒体文件是否应交给浏览器直接打开。 */
 function shouldOpenLargeMediaOnMobile(fileType: FileType, fileSize: number) {
   return (
     isMobileBrowser() &&
@@ -38,16 +38,11 @@ function shouldOpenLargeMediaOnMobile(fileType: FileType, fileSize: number) {
   );
 }
 
-/** 提供文件卡片的选择、查看、下载和编辑等操作。 */
 export function useFileCardActions(file: FileItem) {
   const { updateFileMetadata, moveToTrashLocal } = useFileDataStore();
-
   const { toggleSelection } = useFileUIStore();
-
   const { safeMode } = useGeneralSettingsStore();
-
   const { openPreview } = usePreviewStore();
-
   const selectedKeys = useActiveSelectedKeys();
 
   const [showDetail, setShowDetail] = useState(false);
@@ -59,10 +54,11 @@ export function useFileCardActions(file: FileItem) {
   const isSelected = selectedKeys.includes(file.name);
   const fileType = useMemo(() => getFileTypeFromKey(file.name), [file.name]);
   const blur = shouldBlur({ safeMode, tags: file.metadata?.tags ?? [] });
-  const isIncompleteUpload =
+  const isIncompleteUpload = Boolean(
     file.metadata?.chunkInfo &&
-    file.metadata.chunkInfo.uploadedIndices?.length !==
-      file.metadata.chunkInfo.total;
+      file.metadata.chunkInfo.uploadedIndices?.length !==
+        file.metadata.chunkInfo.total,
+  );
 
   const handleSelect = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -70,7 +66,7 @@ export function useFileCardActions(file: FileItem) {
   };
 
   const handleDelete = () => {
-    if (!confirm(`确定删除文件 ${file.metadata?.fileName} ?`)) return;
+    if (!confirm(`确定将「${file.metadata?.fileName}」移入回收站吗？`)) return;
     moveToTrash(file.name).then(() => {
       moveToTrashLocal(file);
       toast.success("已移入回收站");
@@ -80,7 +76,7 @@ export function useFileCardActions(file: FileItem) {
   const handleCopyLink = () => {
     const url = getFileUrl(file.name);
     navigator.clipboard.writeText(url);
-    toast.success("文件链接复制成功~");
+    toast.success("直链已复制到剪贴板");
   };
 
   const handleShare = () => {
@@ -93,7 +89,7 @@ export function useFileCardActions(file: FileItem) {
     const fileSize = file.metadata?.fileSize || 0;
 
     if (shouldOpenLargeMediaOnMobile(fileType, fileSize)) {
-      toast.info("已打开文件链接，请使用浏览器下载");
+      toast.info("已打开媒体流链接，可通过浏览器直接保存");
       window.open(getFileUrl(file.name), "_blank", "noopener,noreferrer");
       return;
     }
@@ -106,7 +102,7 @@ export function useFileCardActions(file: FileItem) {
     void downloadFile(url, file.metadata, (progress) => {
       if (!toastId) return;
       const message = progress.dirName
-        ? `下载到 ${progress.dirName}: ${fileName} (${progress.percentage}%)`
+        ? `下载至 ${progress.dirName}: ${fileName} (${progress.percentage}%)`
         : `下载中: ${fileName} (${progress.percentage}%)`;
       toast.loading(message, { id: toastId });
     })
@@ -117,7 +113,7 @@ export function useFileCardActions(file: FileItem) {
           return;
         }
         const message = result.dirName
-          ? `下载完成: ${fileName}，已保存到 ${result.dirName}`
+          ? `下载完成: ${fileName}（已保存至 ${result.dirName}）`
           : `下载完成: ${fileName}`;
         toast.success(message, { id: toastId });
       })
@@ -145,25 +141,20 @@ export function useFileCardActions(file: FileItem) {
         window.open(url, "_blank", "noopener,noreferrer");
         return;
       }
-
       openPreview(file, "text");
       return;
     }
 
-    // 视频预览（预览器支持流式播放，不需要改变）
     if (fileType === FileType.Video) {
       openPreview(file, "video");
       return;
     }
 
-    // 音频预览（预览器支持流式播放，不需要改变）
     if (fileType === FileType.Audio) {
       openPreview(file, "audio");
       return;
     }
 
-    // 其他类型（图片、PDF、压缩包等）
-    // 大文件直接触发下载
     if (fileSize > DIRECT_DOWNLOAD_LIMIT) {
       handleDownload();
       return;
@@ -197,55 +188,86 @@ export function useFileCardActions(file: FileItem) {
   };
 
   const handleResumeFileSelect = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const selectedFile = e.target.files?.[0];
+    e.target.value = "";
     if (!selectedFile || !isIncompleteUpload) return;
 
-    if (
-      selectedFile.name !== file.metadata?.fileName ||
-      selectedFile.size !== file.metadata?.fileSize
-    ) {
-      toast.error("文件不匹配");
+    if (selectedFile.size !== file.metadata?.fileSize) {
+      toast.error("所选文件大小与待续传记录不一致");
       return;
     }
 
     setIsResuming(true);
     const chunkInfo = file.metadata.chunkInfo!;
     const totalChunks = chunkInfo.total;
+    const toastId = toast.loading(`正在断点续传: ${file.metadata.fileName}...`);
 
     try {
       const chunkIndicesToUpload = getMissingChunkIndices(
         totalChunks,
-        chunkInfo.uploadedIndices
+        chunkInfo.uploadedIndices,
       );
 
-      await processBatch(
+      const newChunks: Chunk[] = [];
+      let thumbUrl: string | undefined;
+      let done = 0;
+
+      await runConcurrentPool(
         chunkIndicesToUpload,
+        MAX_CONCURRENTS,
         async (chunkIndex) => {
           const start = chunkIndex * MAX_CHUNK_SIZE;
           const endPos = Math.min(start + MAX_CHUNK_SIZE, selectedFile.size);
-          const chunkFile = selectedFile.slice(start, endPos);
+          const chunkBlob = selectedFile.slice(start, endPos);
 
-          await uploadChunk(file.name, chunkIndex, chunkFile);
+          const res = await uploadChunkDirectWithProgress(
+            file.name,
+            chunkIndex,
+            chunkBlob,
+            file.metadata.fileName,
+          );
+          if (res.thumbUrl && !thumbUrl) {
+            thumbUrl = res.thumbUrl;
+          }
+          newChunks.push({
+            idx: chunkIndex,
+            file_id: res.chunkId,
+            size: res.size || endPos - start,
+          });
+          done += 1;
+          toast.loading(
+            `正在续传 ${file.metadata.fileName} (${done}/${chunkIndicesToUpload.length})`,
+            { id: toastId },
+          );
         },
-        undefined,
-        MAX_CONCURRENTS
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      window.location.reload();
-      toast.success(`上传成功`);
+      const finalized = await completeChunkUpload({
+        key: file.name,
+        fileType,
+        fileName: file.metadata.fileName,
+        fileSize: file.metadata.fileSize,
+        totalChunks,
+        thumbUrl,
+        chunks: newChunks,
+      });
+
+      updateFileMetadata(file.name, finalized.metadata);
+      toast.success(`断点续传完成：${file.metadata.fileName}`, { id: toastId });
     } catch (error) {
       console.error("继续上传失败:", error);
-      toast.error("继续上传失败");
+      toast.error(
+        `续传失败：${error instanceof Error ? error.message : "网络错误"}`,
+        { id: toastId },
+      );
     } finally {
       setIsResuming(false);
     }
   };
 
   return {
-    // States
     isSelected,
     fileType,
     blur,
@@ -254,10 +276,7 @@ export function useFileCardActions(file: FileItem) {
     showEdit,
     showShare,
     isResuming,
-
     inputRef,
-
-    // Actions
     setShowDetail,
     setShowEdit,
     setShowShare,
