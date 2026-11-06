@@ -16,7 +16,6 @@ export interface R2Bucket {
   delete(key: string): Promise<void>;
 }
 
-/** Cloudflare Workers AI binding（在 Pages Functions Bindings 面板中配置，变量名为 AI） */
 export interface WorkersAI {
   run(model: string, inputs: Record<string, any>): Promise<any>;
 }
@@ -24,7 +23,7 @@ export interface WorkersAI {
 export type Env = {
   oh_file_url: KVNamespace;
   oh_file_r2?: R2Bucket;
-  /** JWT 签名密钥，必填；缺失时登录与鉴权将拒绝服务，避免回退到弱密钥 */
+  /** JWT 签名密钥，必填；缺失时登录与鉴权将拒绝服务 */
   JWT_SECRET: string;
   PASSWORD?: string;
   API_TOKEN?: string;
@@ -33,6 +32,13 @@ export type Env = {
   TG_BOT_TOKEN?: string;
   TG_WEBHOOK_SECRET?: string;
 
-  /** Workers AI binding，可选；不配置时 AI 富化功能自动跳过 */
+  /** Telegram Web Login (OIDC) 环境变量（可选，亦可在系统设置面板在线配置） */
+  TG_CLIENT_ID?: string;
+  TG_OIDC_CLIENT_ID?: string;
+  TG_OIDC_SECRET?: string;
+  TG_ALLOWED_USER_IDS?: string;
+  TG_ALLOWED_USER_ID?: string;
+  TG_REDIRECT_URI?: string;
+
   AI?: WorkersAI;
 };

@@ -150,6 +150,11 @@ API_TOKEN=your_api_token        # (可选) 用于 API 调用的 Token
 
 # Telegram 频道/群组上传
 TG_WEBHOOK_SECRET=your_secret   # 自定义 Webhook 校验密钥，建议 32 位以上随机字符串
+
+# Telegram Web OAuth 联合登录（可选，亦可在部署后进入「系统设置 → 常规设置」在线配置）
+TG_OIDC_SECRET=your_oidc_secret # @BotFather -> Bot Settings -> Web Login 生成的 Client Secret
+TG_CLIENT_ID=123456789          # (可选) 默认自动从 TG_BOT_TOKEN 前缀提取 Bot ID
+TG_ALLOWED_USER_IDS=123456789   # (可选) 允许登录的个人 Telegram User ID（当 TG_CHAT_ID 为正数个人 ID 时自动继承）
 ```
 
 > `TG_CHAT_ID` 和 `TG_BOT_TOKEN` 需在 Telegram 中获取。

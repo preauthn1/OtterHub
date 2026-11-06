@@ -1,52 +1,47 @@
+import { decodeJwt, jwtVerify, SignJWT } from "jose";
 import { createMiddleware } from "hono/factory";
-import { verifyJWT } from "@utils/auth";
+import { getCookie } from "hono/cookie";
 import type { Env } from "../types/hono";
 import { fail } from "@utils/response";
 
 const PUBLIC_PATHS = [
   /^\/$/,
   /^\/auth\/login/,
+  /^\/auth\/telegram\/(start|callback|status)/,
   /^\/_next\//,
   /\.(ico|png|svg|jpg|jpeg|css|js|webmanifest|json|woff|woff2|ttf|eot)$/,
 ];
 
 export const authMiddleware = createMiddleware<{ Bindings: Env }>(
   async (c, next) => {
-    const path = c.req.path;
-    if (PUBLIC_PATHS.some((pattern) => pattern.test(path))) {
-      await next();
-      return;
+    const url = new URL(c.req.url);
+    if (PUBLIC_PATHS.some((regex) => regex.test(url.pathname))) {
+      return next();
     }
 
-    const env = c.env;
-
-    // 1. 优先检查 API Token (Authorization Header)
     const authHeader = c.req.header("Authorization");
-    if (authHeader && env.API_TOKEN) {
-      const token = authHeader.replace(/Bearer\s+/i, "");
-      if (token === env.API_TOKEN) {
-        await next();
-        return;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      if (c.env.API_TOKEN && token === c.env.API_TOKEN) {
+        return next();
       }
     }
 
-    // 2. 检查 Cookie
-    const cookie = c.req.header("Cookie");
-    const authCookie = cookie?.match(/(?:^|;\s*)auth=([^;]+)/)?.[1];
+    const token = getCookie(c, "auth");
+    if (!token) {
+      return fail(c, "Unauthorized", 401);
+    }
 
-    if (!authCookie) {
-      return fail(c, `Unauthorized, cookie: ${cookie}`, 401);
+    if (!c.env.JWT_SECRET) {
+      return fail(c, "Server misconfigured: JWT_SECRET is required", 500);
     }
 
     try {
-      // 未配置 JWT_SECRET 时直接拒绝，禁止回退到密码或硬编码密钥
-      if (!env.JWT_SECRET) {
-        return fail(c, "Server misconfigured: JWT_SECRET is required", 500);
-      }
-      await verifyJWT(authCookie, env.JWT_SECRET);
-      await next();
-    } catch (e) {
-      return fail(c, "Unauthorized", 401);
+      const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+      await jwtVerify(token, secret);
+      return next();
+    } catch {
+      return fail(c, "Invalid or expired token", 401);
     }
   }
 );

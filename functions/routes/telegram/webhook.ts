@@ -52,6 +52,15 @@ telegramWebhookRoutes.post("/webhook", async (c) => {
     return ok(c, { ignored: "no-message" });
   }
 
+  const incomingChatId = message?.chat?.id;
+  if (incomingChatId && !c.env.TG_CHAT_ID) {
+    await c.env.oh_file_url.put(
+      "oh_tg_chat_id",
+      String(incomingChatId),
+      { metadata: { chatType: message.chat?.type || "", at: Date.now() } }
+    );
+  }
+
   const media = getTelegramFileFromMessage(message);
   if (!media) {
     return ok(c, { ignored: "message-without-file" });

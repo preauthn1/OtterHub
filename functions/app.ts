@@ -9,6 +9,7 @@ import { trashRoutes } from "./routes/trash";
 import { proxyRoutes } from "./routes/proxy";
 import { shareRoutes } from "./routes/share";
 import { telegramWebhookRoutes } from "./routes/telegram/webhook";
+import { telegramLoginRoutes } from "./routes/telegram-login";
 import { Hono } from "hono";
 import type { Env } from "./types/hono";
 
@@ -23,6 +24,7 @@ app.use("*", corsMiddleware);
 app.route("/file", fileRoutes);
 
 app.route("/auth", authRoutes);
+app.route("/auth", telegramLoginRoutes);
 app.route("/settings", settingsRoutes);
 app.route("/health", healthRoutes);
 app.route("/wallpaper", wallpaperRoutes);
